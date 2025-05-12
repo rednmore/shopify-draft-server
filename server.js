@@ -21,11 +21,10 @@ if (!data.customers) {
   return res.status(500).json({ message: "Données introuvables", raw: data });
 }
 const clients = data.customers.map(c => ({
-
-      id: c.id,
-      email: c.email,
-      name: `${c.first_name || ''} ${c.last_name || ''}`.trim()
-    }));
+  id: c.id,
+  email: c.email || "(aucun email)",
+  name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Client ${c.id}`
+}));
     res.json(clients);
   } catch (err) {
     res.status(500).json({ message: err.message });
