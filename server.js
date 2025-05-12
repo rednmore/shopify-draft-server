@@ -7,7 +7,10 @@ require('dotenv').config();
 const app = express();
 
 // ✅ Remplacez ici par l'URL exacte de votre boutique Shopify
-const ALLOWED_ORIGIN = "https://votre-boutique.myshopify.com";
+const ALLOWED_ORIGIN = "https://www.xn--zy-gka.com";
+app.use(cors({
+  origin: ALLOWED_ORIGIN
+}));
 
 // 🔐 Clé API secrète attendue
 const API_SECRET = process.env.API_SECRET || "defaultsecret";
