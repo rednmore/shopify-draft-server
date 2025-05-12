@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Serveur pour créer des draft orders Shopify",
   "main": "server.js",
-  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
