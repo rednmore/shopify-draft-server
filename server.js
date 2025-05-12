@@ -53,13 +53,14 @@ const clients = await Promise.all(
       const detail = await detailRes.json();
       const full = detail.customer;
 
-      return {
-        id: full.id,
-        first_name: full.first_name || "",
-        last_name: full.last_name || "",
-        company: full.company || "",
-        email: full.email || ""
-      };
+    return {
+  id: full.id,
+  first_name: full.first_name || "",
+  last_name: full.last_name || "",
+  company: full.default_address?.company || "",
+  email: full.email || ""
+};
+
     } catch (err) {
       console.warn(`Erreur pour le client ${c.id} :`, err.message);
       return {
