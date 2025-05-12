@@ -1,10 +1,26 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const cors = require('cors');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
+
+// ✅ CORS : autoriser uniquement votre boutique Shopify
+app.use(cors({
+  origin: "https://21qdxp-hd.myshopify.com" // 
+}));
 app.use(bodyParser.json());
+
+// 🔐 Middleware API key
+const API_SECRET = process.env.API_SECRET || "secret-par-défaut";
+app.use((req, res, next) => {
+  const key = req.headers['x-api-key'];
+  if (!key || key !== API_SECRET) {
+    return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
+  }
+  next();
+});
 
 // Liste des clients
 app.get('/list-customers', async (req, res) => {
@@ -16,18 +32,19 @@ app.get('/list-customers', async (req, res) => {
       }
     });
 const data = await r.json();
-console.log("Réponse Shopify :", data); // ➕ DEBUG
 if (!data.customers) {
-  return res.status(500).json({ message: "Données introuvables", raw: data });
-}
-const clients = data.customers.map(c => ({
-  id: c.id,
-  email: c.email || "(aucun email)",
-  name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Client ${c.id}`
-}));
+      return res.status(500).json({ message: "Données introuvables", raw: data });
+    }
+
+    const clients = data.customers.map(c => ({
+      id: c.id,
+      email: c.email || "(aucun email)",
+      name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Client ${c.id}`
+    }));
+
     res.json(clients);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: "Erreur serveur : " + err.message });
   }
 });
 
@@ -57,6 +74,8 @@ app.post('/create-draft-order', async (req, res) => {
     const draft = await draftRes.json();
     const id = draft.draft_order.id;
 
+
+     // Envoi de la facture
     await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/draft_orders/${id}/send_invoice.json`, {
       method: 'POST',
       headers: {
