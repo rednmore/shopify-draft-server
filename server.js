@@ -6,37 +6,22 @@ require('dotenv').config();
 
 const app = express();
 
-// ✅ Remplacez ici par l'URL exacte de votre boutique Shopify
-const ALLOWED_ORIGIN = "https://www.xn--zy-gka.com";
-app.use(cors({
-  origin: ALLOWED_ORIGIN
-}));
+// ✅ Remplacez ici par votre domaine réel encodé si besoin (ex. pour zyö.com)
+const ALLOWED_ORIGIN = "https://www.xn--zy-gka.com"; // ← changez ici si votre domaine change
 
-// 🔐 Clé API secrète attendue
-const API_SECRET = process.env.API_SECRET || "defaultsecret";
-
-// ✅ CORS autorisé uniquement pour Shopify
 app.use(cors({
   origin: ALLOWED_ORIGIN
 }));
 
 app.use(bodyParser.json());
 
-// ✅ Vérification de la clé via Authorization: Bearer
+// ⚠️ Sécurité temporairement désactivée pour tests
 app.use((req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const queryKey = req.query.key;
-
-  const key = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : queryKey;
-
-  if (!key || key !== API_SECRET) {
-    console.log("🔍 Clé reçue (fallback) :", key);
-    return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
-  }
+  console.log("⚠️ Sécurité désactivée temporairement pour test.");
   next();
 });
 
-// 🔹 Route GET /list-customers
+// 🔹 GET /list-customers
 app.get('/list-customers', async (req, res) => {
   try {
     const r = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/customers.json?limit=100`, {
@@ -64,7 +49,7 @@ app.get('/list-customers', async (req, res) => {
   }
 });
 
-// 🔹 Route POST /create-draft-order
+// 🔹 POST /create-draft-order
 app.post('/create-draft-order', async (req, res) => {
   const { customer_id, items } = req.body;
   if (!customer_id || !items) {
@@ -115,7 +100,7 @@ app.post('/create-draft-order', async (req, res) => {
   }
 });
 
-// 🔹 Lancer le serveur
+// 🚀 Démarrage du serveur
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
