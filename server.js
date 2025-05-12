@@ -32,6 +32,7 @@ app.get('/list-customers', async (req, res) => {
     });
 
     const data = await r.json();
+console.log("👁️ Extrait brut du client 0 :", data.customers?.[0]);
 
     if (!data.customers) {
       return res.status(500).json({ message: "Données introuvables", raw: data });
