@@ -108,7 +108,8 @@ app.post('/create-draft-order', async (req, res) => {
       })
     });
 
-    const draft = await draftRes.json(); if (!draft.draft_order || !draft.draft_order.id) {
+    const draft = await draftRes.json(); console.error("❌ Réponse Shopify lors du draft :", JSON.stringify(draft, null, 2));
+ if (!draft.draft_order || !draft.draft_order.id) {
   console.error("❌ Erreur Shopify :", draft);
   return res.status(500).json({ message: "Erreur lors de la création du draft order", raw: draft });
 }
