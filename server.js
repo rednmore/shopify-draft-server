@@ -38,13 +38,40 @@ console.log("👁️ Extrait brut du client 0 :", data.customers?.[0]);
       return res.status(500).json({ message: "Données introuvables", raw: data });
     }
 
-  const clients = data.customers.map(c => ({
-  id: c.id,
-  first_name: c.first_name || "",
-  last_name: c.last_name || "",
-  company: c.company || "",
-  email: c.email || ""
-}));
+  const basicCustomers = data.customers;
+
+const clients = await Promise.all(
+  basicCustomers.map(async (c) => {
+    try {
+      const detailRes = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/customers/${c.id}.json`, {
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const detail = await detailRes.json();
+      const full = detail.customer;
+
+      return {
+        id: full.id,
+        first_name: full.first_name || "",
+        last_name: full.last_name || "",
+        company: full.company || "",
+        email: full.email || ""
+      };
+    } catch (err) {
+      console.warn(`Erreur pour le client ${c.id} :`, err.message);
+      return {
+        id: c.id,
+        first_name: "",
+        last_name: "",
+        company: "",
+        email: ""
+      };
+    }
+  })
+);
 
     res.json(clients);
     console.log("👁️ Clients transmis au frontend :", clients);
