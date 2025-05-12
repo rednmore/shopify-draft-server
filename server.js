@@ -6,23 +6,31 @@ require('dotenv').config();
 
 const app = express();
 
-// ✅ CORS : autoriser uniquement votre boutique Shopify
+// ✅ Remplacez ici par l'URL exacte de votre boutique Shopify
+const ALLOWED_ORIGIN = "https://votre-boutique.myshopify.com";
+
+// 🔐 Clé API secrète attendue
+const API_SECRET = process.env.API_SECRET || "defaultsecret";
+
+// ✅ CORS autorisé uniquement pour Shopify
 app.use(cors({
-  origin: "https://21qdxp-hd.myshopify.com" // 
+  origin: ALLOWED_ORIGIN
 }));
+
 app.use(bodyParser.json());
 
-// 🔐 Middleware API key
-const API_SECRET = process.env.API_SECRET || "secret-par-défaut";
+// ✅ Vérification de la clé via Authorization: Bearer
 app.use((req, res, next) => {
-  const key = req.headers['x-api-key'];
+  const authHeader = req.headers['authorization'];
+  const key = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
   if (!key || key !== API_SECRET) {
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
   }
   next();
 });
 
-// Liste des clients
+// 🔹 Route GET /list-customers
 app.get('/list-customers', async (req, res) => {
   try {
     const r = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/customers.json?limit=100`, {
@@ -31,8 +39,10 @@ app.get('/list-customers', async (req, res) => {
         "Content-Type": "application/json"
       }
     });
-const data = await r.json();
-if (!data.customers) {
+
+    const data = await r.json();
+
+    if (!data.customers) {
       return res.status(500).json({ message: "Données introuvables", raw: data });
     }
 
@@ -48,10 +58,12 @@ if (!data.customers) {
   }
 });
 
-// Création d'une draft order
+// 🔹 Route POST /create-draft-order
 app.post('/create-draft-order', async (req, res) => {
   const { customer_id, items } = req.body;
-  if (!customer_id || !items) return res.status(400).json({ message: "Données manquantes" });
+  if (!customer_id || !items) {
+    return res.status(400).json({ message: "Données manquantes" });
+  }
 
   try {
     const draftRes = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/draft_orders.json`, {
@@ -66,7 +78,7 @@ app.post('/create-draft-order', async (req, res) => {
           customer: { id: customer_id },
           use_customer_default_address: true,
           tags: ["INTERNAL"],
-          note: "Commande interne via Storefront"
+          note: "Commande créée depuis le Storefront interne"
         }
       })
     });
@@ -74,8 +86,7 @@ app.post('/create-draft-order', async (req, res) => {
     const draft = await draftRes.json();
     const id = draft.draft_order.id;
 
-
-     // Envoi de la facture
+    // 🔹 Envoi automatique de la facture
     await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/draft_orders/${id}/send_invoice.json`, {
       method: 'POST',
       headers: {
@@ -83,7 +94,12 @@ app.post('/create-draft-order', async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        draft_order_invoice: { to: null, from: null, subject: null, custom_message: null }
+        draft_order_invoice: {
+          to: null,
+          from: null,
+          subject: null,
+          custom_message: null
+        }
       })
     });
 
@@ -93,5 +109,8 @@ app.post('/create-draft-order', async (req, res) => {
   }
 });
 
+// 🔹 Lancer le serveur
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Serveur actif sur le port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`✅ Serveur actif sur le port ${PORT}`);
+});
