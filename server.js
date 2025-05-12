@@ -46,6 +46,7 @@ app.get('/list-customers', async (req, res) => {
 }));
 
     res.json(clients);
+    console.log("👁️ Clients transmis au frontend :", clients);
   } catch (err) {
     res.status(500).json({ message: "Erreur serveur : " + err.message });
   }
