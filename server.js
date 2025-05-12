@@ -15,8 +15,13 @@ app.get('/list-customers', async (req, res) => {
         "Content-Type": "application/json"
       }
     });
-    const data = await r.json();
-    const clients = data.customers.map(c => ({
+const data = await r.json();
+console.log("Réponse Shopify :", data); // ➕ DEBUG
+if (!data.customers) {
+  return res.status(500).json({ message: "Données introuvables", raw: data });
+}
+const clients = data.customers.map(c => ({
+
       id: c.id,
       email: c.email,
       name: `${c.first_name || ''} ${c.last_name || ''}`.trim()
