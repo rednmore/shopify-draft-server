@@ -24,6 +24,9 @@ app.use((req, res, next) => {
   const authHeader = req.headers['authorization'];
   const key = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
+console.log("🔍 Clé reçue :", key);
+console.log("🔐 Clé attendue :", API_SECRET);
+  
   if (!key || key !== API_SECRET) {
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
   }
