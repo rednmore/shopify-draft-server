@@ -22,12 +22,12 @@ app.use(bodyParser.json());
 // ✅ Vérification de la clé via Authorization: Bearer
 app.use((req, res, next) => {
   const authHeader = req.headers['authorization'];
-  const key = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const queryKey = req.query.key;
 
-console.log("🔍 Clé reçue :", key);
-console.log("🔐 Clé attendue :", API_SECRET);
-  
+  const key = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : queryKey;
+
   if (!key || key !== API_SECRET) {
+    console.log("🔍 Clé reçue (fallback) :", key);
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
   }
   next();
