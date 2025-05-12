@@ -102,7 +102,7 @@ app.post('/create-draft-order', async (req, res) => {
           line_items: items,
           customer: { id: customer_id },
           use_customer_default_address: true,
-          tags: ["INTERNAL"],
+          tags: "INTERNAL",
           note: "Commande créée depuis le Storefront interne"
         }
       })
