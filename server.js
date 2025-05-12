@@ -37,11 +37,13 @@ app.get('/list-customers', async (req, res) => {
       return res.status(500).json({ message: "Données introuvables", raw: data });
     }
 
-    const clients = data.customers.map(c => ({
-      id: c.id,
-      email: c.email || "(aucun email)",
-      name: `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.email || `Client ${c.id}`
-    }));
+  const clients = data.customers.map(c => ({
+  id: c.id,
+  first_name: c.first_name || "",
+  last_name: c.last_name || "",
+  company: c.company || "",
+  email: c.email || ""
+}));
 
     res.json(clients);
   } catch (err) {
