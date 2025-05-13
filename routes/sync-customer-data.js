@@ -6,11 +6,11 @@ const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 
 router.post('/', async (req, res) => {
-   // ✅ Si Shopify envoie un appel vide (test du webhook), on répond 200
+  // ✅ Shopify ping test (empty body)
   if (!req.body || Object.keys(req.body).length === 0) {
-    return res.status(200).send('✅ Webhook endpoint is live.');
+    return res.status(200).json({ message: 'Webhook OK' });
   }
-  
+
   const customerId = req.body.id;
 
   if (!customerId) {
