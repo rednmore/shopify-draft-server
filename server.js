@@ -112,15 +112,15 @@ if (origin && !ALLOWED_ORIGINS.includes(origin)) {
         label:
           (full.first_name || full.last_name)
             ? `${full.first_name || ''} ${full.last_name || ''}`.trim()
-            : full.default_address?.company || full.addresses?.[0]?.company ||
-              full.email || `Client ${full.id}`
+            : (full.default_address?.company || full.addresses?.[0]?.company || full.email || `Client ${full.id}`)
       };
     } catch (err) {
       console.warn(`⚠️ Erreur pour le client ${c.id} :`, err.message);
-      return { id: c.id, label: `Client ${c.id}` }; // fallback sécurisé
+      return { id: c.id, label: `Client ${c.id}` };
     }
-  })
-);
+  }) // ← parenthèse fermante du `.map(...)`
+);    // ← parenthèse fermante du `Promise.all(...)`
+
 
 
     res.json(clients);
