@@ -3,7 +3,7 @@ const axios = require('axios');
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL; // ex: https://votre-boutique.myshopify.com/admin/api/2024-01
-const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com/sync-customer-data'; // remplacez par votre URL réelle
+const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com'; // remplacez par votre URL réelle
 
 async function registerCustomerCreateWebhook() {
   try {
