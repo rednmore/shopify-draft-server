@@ -2,18 +2,35 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const fetch = require('node-fetch');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
-
-// ✅ Autoriser uniquement votre domaine Shopify
 const ALLOWED_ORIGIN = "https://www.xn--zy-gka.com";
 
-app.use(cors({
-  origin: ALLOWED_ORIGIN
-}));
+// ✅ Global rate limit (toutes les routes)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 min
+  max: 100, // 100 requêtes max par IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Trop de requêtes. Veuillez réessayer plus tard."
+  }
+});
 
+app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(bodyParser.json());
+app.use(globalLimiter); // ✅ Appliqué à toutes les routes
+
+// ✅ Limiteur spécifique pour la création de commandes
+const orderLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 10, // 10 commandes max par IP
+  message: {
+    message: "Trop de créations de commande. Veuillez patienter avant de réessayer."
+  }
+});
 
 // 🔹 GET /list-customers
 app.get('/list-customers', async (req, res) => {
@@ -74,10 +91,7 @@ app.get('/list-customers', async (req, res) => {
           };
         } catch (err) {
           console.warn(`Erreur pour le client ${c.id} :`, err.message);
-          return {
-            id: c.id,
-            label: `Client ${c.id}`
-          };
+          return { id: c.id, label: `Client ${c.id}` };
         }
       })
     );
@@ -89,8 +103,8 @@ app.get('/list-customers', async (req, res) => {
   }
 });
 
-// 🔹 POST /create-draft-order
-app.post('/create-draft-order', async (req, res) => {
+// 🔹 POST /create-draft-order (avec limiteur spécifique)
+app.post('/create-draft-order', orderLimiter, async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
   const serverKey = process.env.API_SECRET;
 
@@ -140,7 +154,6 @@ app.post('/create-draft-order', async (req, res) => {
 
     const id = draft.draft_order.id;
 
-    // 🔹 Envoi automatique de la facture
     await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/draft_orders/${id}/send_invoice.json`, {
       method: 'POST',
       headers: {
