@@ -6,15 +6,16 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const syncCustomerData = require('./routes/sync-customer-data');
-require('./scripts/register-webhook'); // ← webhook à l'initialisation
+require('./scripts/register-webhook');
 
 const app = express();
-
-// ✅ Origines autorisées (punycodée et non)
 const ALLOWED_ORIGINS = [
   "https://www.xn--zy-gka.com",
   "https://www.zyö.com"
 ];
+
+// ✅ Shopify base URL construit dynamiquement
+const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
 
 // ✅ Limiteur global
 const globalLimiter = rateLimit({
@@ -22,9 +23,7 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    message: "Trop de requêtes. Veuillez réessayer plus tard."
-  }
+  message: { message: "Trop de requêtes. Veuillez réessayer plus tard." }
 });
 
 app.use(cors({
@@ -33,7 +32,7 @@ app.use(cors({
       callback(null, true);
     } else {
       console.warn("⛔ Origine refusée :", origin);
-      callback(new Error("CORS non autorisé pour cette origine."));
+      callback(new Error("CORS non autorisé"));
     }
   }
 }));
@@ -42,13 +41,11 @@ app.use(bodyParser.json());
 app.use(globalLimiter);
 app.use('/sync-customer-data', syncCustomerData);
 
-// ✅ Limiteur pour la route /create-draft-order
+// ✅ Limiteur sur la route /create-draft-order
 const orderLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 10,
-  message: {
-    message: "Trop de créations de commande. Veuillez patienter avant de réessayer."
-  }
+  message: { message: "Trop de créations de commande. Veuillez patienter." }
 });
 
 // 🔹 GET /list-customers
@@ -63,16 +60,16 @@ app.get('/list-customers', async (req, res) => {
 
   if (!clientKey || clientKey !== serverKey) {
     console.warn("⛔ Accès refusé à /list-customers (clé)");
-    return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
+    return res.status(403).json({ message: "Clé API invalide" });
   }
 
   if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-    console.warn("⛔ Accès refusé à /list-customers (origine)");
+    console.warn("⛔ Origine non autorisée :", origin);
     return res.status(403).json({ message: "Origine non autorisée" });
   }
 
   try {
-    const r = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/customers.json?limit=100`, {
+    const r = await fetch(`${shopifyBaseUrl}/customers.json?limit=100`, {
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Content-Type": "application/json"
@@ -80,16 +77,16 @@ app.get('/list-customers', async (req, res) => {
     });
 
     const data = await r.json();
-    console.log("👁️ Extrait brut du client 0 :", data.customers?.[0]);
+    console.log("👁️ Extrait client brut :", data.customers?.[0]);
 
     if (!data.customers) {
-      return res.status(500).json({ message: "Données introuvables", raw: data });
+      return res.status(500).json({ message: "Aucun client trouvé", raw: data });
     }
 
     const clients = await Promise.all(
       data.customers.map(async (c) => {
         try {
-          const detailRes = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/customers/${c.id}.json`, {
+          const detailRes = await fetch(`${shopifyBaseUrl}/customers/${c.id}.json`, {
             headers: {
               "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
               "Content-Type": "application/json"
@@ -99,8 +96,6 @@ app.get('/list-customers', async (req, res) => {
           const detail = await detailRes.json();
           const full = detail.customer;
 
-          if (!full || !full.id) throw new Error("Client non valide");
-
           return {
             id: full.id,
             label:
@@ -109,17 +104,17 @@ app.get('/list-customers', async (req, res) => {
                 : full.default_address?.company || full.addresses?.[0]?.company || full.email || `Client ${full.id}`
           };
         } catch (err) {
-          console.warn(`⚠️ Erreur pour client ${c.id} :`, err.message);
+          console.warn(`⚠️ Erreur client ${c.id} :`, err.message);
           return { id: c.id, label: `Client ${c.id}` };
         }
       })
     );
 
     res.json(clients);
-    console.log("👁️ Clients transmis au frontend :", clients);
+    console.log("📤 Clients envoyés :", clients);
   } catch (err) {
-    console.error("❌ Erreur dans /list-customers :", err.message);
-    res.status(500).json({ message: "Erreur serveur : " + err.message });
+    console.error("❌ Erreur /list-customers :", err.message);
+    res.status(500).json({ message: "Erreur serveur", detail: err.message });
   }
 });
 
@@ -134,12 +129,10 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
   console.log("🌍 Origine reçue :", origin);
 
   if (!clientKey || clientKey !== serverKey) {
-    console.warn("⛔ Accès refusé à /create-draft-order (clé)");
-    return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
+    return res.status(403).json({ message: "Clé API invalide" });
   }
 
   if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-    console.warn("⛔ Accès refusé à /create-draft-order (origine)");
     return res.status(403).json({ message: "Origine non autorisée" });
   }
 
@@ -149,7 +142,7 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
   }
 
   try {
-    const draftRes = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/draft_orders.json`, {
+    const draftRes = await fetch(`${shopifyBaseUrl}/draft_orders.json`, {
       method: 'POST',
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
@@ -167,15 +160,14 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
     });
 
     const draft = await draftRes.json();
-    console.error("📦 Réponse Shopify lors du draft :", JSON.stringify(draft, null, 2));
-
     if (!draft.draft_order || !draft.draft_order.id) {
-      return res.status(500).json({ message: "Erreur création draft", raw: draft });
+      console.error("❌ Erreur création draft :", draft);
+      return res.status(500).json({ message: "Création échouée", raw: draft });
     }
 
     const id = draft.draft_order.id;
 
-    await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/draft_orders/${id}/send_invoice.json`, {
+    await fetch(`${shopifyBaseUrl}/draft_orders/${id}/send_invoice.json`, {
       method: 'POST',
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
@@ -186,12 +178,12 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 
     res.json({ invoice_url: draft.draft_order.invoice_url });
   } catch (err) {
-    console.error("❌ Erreur dans /create-draft-order :", err.message);
-    res.status(500).json({ message: "Erreur serveur : " + err.message });
+    console.error("❌ Erreur /create-draft-order :", err.message);
+    res.status(500).json({ message: "Erreur serveur", detail: err.message });
   }
 });
 
-// 🚀 Serveur
+// 🚀 Lancement du serveur
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
