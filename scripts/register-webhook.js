@@ -1,15 +1,13 @@
 require('dotenv').config();
 const axios = require('axios');
 
-const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
+const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL; // Doit être comme : "21qdxp-hd.myshopify.com"
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com/sync-customer-data';
 
-const SHOPIFY_API_VERSION = '2023-10';
-
-// 🔧 Helper pour normaliser l'URL de base
+// 🔧 Helper pour construire les URL correctes
 function buildShopifyAdminUrl(path) {
-  return `https://${SHOPIFY_API_URL}/admin/api/${SHOPIFY_API_VERSION}${path}`;
+  return `https://${SHOPIFY_API_URL}/admin/api/2023-10${path}`;
 }
 
 if (!SHOPIFY_API_URL || !SHOPIFY_API_KEY) {
@@ -32,7 +30,7 @@ async function registerCustomerCreateWebhook() {
     );
 
     if (found) {
-      console.log(`⚠️ Le webhook "customers/create" existe déjà pour cette adresse (id: ${found.id}).`);
+      console.log(`⚠️ Le webhook "customers/create" existe déjà (id: ${found.id}).`);
       return;
     }
 
