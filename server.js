@@ -74,9 +74,9 @@ if (origin && !ALLOWED_ORIGINS.includes(origin)) {
 }
 
   try {
-    const r = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/customers.json?limit=100`, {
+    const r = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/customers.json?limit=100`, {
       headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Content-Type": "application/json"
       }
     });
@@ -91,9 +91,9 @@ if (origin && !ALLOWED_ORIGINS.includes(origin)) {
     const clients = await Promise.all(
       data.customers.map(async (c) => {
         try {
-          const detailRes = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/customers/${c.id}.json`, {
+          const detailRes = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/customers/${c.id}.json`, {
             headers: {
-              "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+              "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
               "Content-Type": "application/json"
             }
           });
@@ -149,10 +149,10 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
   }
 
   try {
-    const draftRes = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/draft_orders.json`, {
+    const draftRes = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/draft_orders.json`, {
       method: 'POST',
       headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -175,10 +175,10 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 
     const id = draft.draft_order.id;
 
-    await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/draft_orders/${id}/send_invoice.json`, {
+    await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/draft_orders/${id}/send_invoice.json`, {
       method: 'POST',
       headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_ADMIN_TOKEN,
+        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
