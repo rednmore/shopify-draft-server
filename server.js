@@ -93,32 +93,35 @@ if (origin && !ALLOWED_ORIGINS.includes(origin)) {
     }
 
     const clients = await Promise.all(
-      data.customers.map(async (c) => {
-        try {
-          const detailRes = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/customers/${c.id}.json`, {
-            headers: {
-              "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-              "Content-Type": "application/json"
-            }
-          });
-
-          const detail = await detailRes.json();
-          const full = detail.customer;
-
-          return {
-            id: full.id,
-            label:
-              (full.first_name || full.last_name)
-                ? `${full.first_name || ''} ${full.last_name || ''}`.trim()
-                : full.default_address?.company || full.addresses?.[0]?.company ||
-                  full.email || `Client ${full.id}`
-          };
-        } catch (err) {
-          console.warn(`Erreur pour le client ${c.id} :`, err.message);
-          return { id: c.id, label: `Client ${c.id}` };
+  data.customers.map(async (c) => {
+    try {
+      const detailRes = await fetch(`https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10/customers/${c.id}.json`, {
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+          "Content-Type": "application/json"
         }
-      })
-    );
+      });
+
+      const detail = await detailRes.json();
+      const full = detail.customer;
+
+      if (!full || !full.id) throw new Error("Client non valide ou vide");
+
+      return {
+        id: full.id,
+        label:
+          (full.first_name || full.last_name)
+            ? `${full.first_name || ''} ${full.last_name || ''}`.trim()
+            : full.default_address?.company || full.addresses?.[0]?.company ||
+              full.email || `Client ${full.id}`
+      };
+    } catch (err) {
+      console.warn(`⚠️ Erreur pour le client ${c.id} :`, err.message);
+      return { id: c.id, label: `Client ${c.id}` }; // fallback sécurisé
+    }
+  })
+);
+
 
     res.json(clients);
     console.log("👁️ Clients transmis au frontend :", clients);
