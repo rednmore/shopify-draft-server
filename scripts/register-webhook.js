@@ -29,15 +29,15 @@ async function registerCustomerCreateWebhook() {
     );
 
     console.log('✅ Webhook créé avec succès :', response.data.webhook.id);
-  } catch (error) {
-    console.error('❌ Erreur lors de la création du webhook :');
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Data:', JSON.stringify(error.response.data, null, 2));
-    } else {
-      console.error(error.message);
-    }
+ } catch (error) {
+  console.error('❌ Erreur lors de la création du webhook :');
+  if (error.response) {
+    console.error('Status:', error.response.status);
+    console.error('Data:', JSON.stringify(error.response.data, null, 2));
+  } else {
+    console.error(error.message);
   }
+}
 }
 
 registerCustomerCreateWebhook();
