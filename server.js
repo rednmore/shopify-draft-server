@@ -30,13 +30,16 @@ const globalLimiter = rateLimit({
 
 app.use(cors({
   origin: (origin, callback) => {
+    // ✅ Autorise les requêtes sans origine (comme celles de Shopify)
     if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn("⛔ Origine refusée :", origin);
       callback(new Error("CORS non autorisé pour cette origine."));
     }
   }
 }));
+
 app.use(bodyParser.json());
 app.use(globalLimiter);
 app.use('/sync-customer-data', syncCustomerData);
