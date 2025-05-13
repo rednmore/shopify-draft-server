@@ -16,7 +16,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 app.use((req, res, next) => {
-  const clientKey = req.query.key || req.headers["x-api-key"];
+  const clientKey = req.headers["x-api-key"];
   const serverKey = process.env.API_SECRET;
   console.log("🔐 Clé reçue :", clientKey);
   console.log("🔒 Clé attendue :", serverKey);
