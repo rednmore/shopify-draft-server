@@ -15,9 +15,15 @@ app.use(cors({
 
 app.use(bodyParser.json());
 
-// ⚠️ Sécurité temporairement désactivée pour tests
 app.use((req, res, next) => {
-  console.log("⚠️ Sécurité désactivée temporairement pour test.");
+  const clientKey = req.query.key || req.headers["x-api-key"];
+  const serverKey = process.env.API_SECRET;
+
+  if (!clientKey || clientKey !== serverKey) {
+    console.warn("⛔ Accès refusé : clé incorrecte ou manquante.");
+    return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
+  }
+
   next();
 });
 
