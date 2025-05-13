@@ -5,9 +5,11 @@ const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com/sync-customer-data';
 
-// 🔧 Helper pour normaliser les URLs
-function normalizeUrl(url) {
-  return url.replace(/\/+$/, '').toLowerCase();
+const SHOPIFY_API_VERSION = '2023-10';
+
+// 🔧 Helper pour normaliser l'URL de base
+function buildShopifyAdminUrl(path) {
+  return `https://${SHOPIFY_API_URL}/admin/api/${SHOPIFY_API_VERSION}${path}`;
 }
 
 if (!SHOPIFY_API_URL || !SHOPIFY_API_KEY) {
@@ -18,7 +20,7 @@ if (!SHOPIFY_API_URL || !SHOPIFY_API_KEY) {
 async function registerCustomerCreateWebhook() {
   try {
     console.log('🔎 Vérification des webhooks existants...');
-    const existing = await axios.get(`${SHOPIFY_API_URL}/webhooks.json`, {
+    const existing = await axios.get(buildShopifyAdminUrl('/webhooks.json'), {
       headers: {
         'X-Shopify-Access-Token': SHOPIFY_API_KEY,
         'Content-Type': 'application/json'
@@ -36,7 +38,7 @@ async function registerCustomerCreateWebhook() {
 
     console.log('📡 Enregistrement du webhook…');
     const response = await axios.post(
-      `${SHOPIFY_API_URL}/webhooks.json`,
+      buildShopifyAdminUrl('/webhooks.json'),
       {
         webhook: {
           topic: 'customers/create',
