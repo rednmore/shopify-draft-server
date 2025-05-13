@@ -16,11 +16,14 @@ app.use(cors({
 app.use(bodyParser.json());
 
 app.use((req, res, next) => {
-  const clientKey = req.headers["x-api-key"];
+  const clientKey =
+    req.headers["x-api-key"] ||
+    req.query.key;
+
   const serverKey = process.env.API_SECRET;
+
   console.log("🔐 Clé reçue :", clientKey);
   console.log("🔒 Clé attendue :", serverKey);
-
 
   if (!clientKey || clientKey !== serverKey) {
     console.warn("⛔ Accès refusé : clé incorrecte ou manquante.");
@@ -29,6 +32,7 @@ app.use((req, res, next) => {
 
   next();
 });
+
 
 // 🔹 GET /list-customers
 app.get('/list-customers', async (req, res) => {
