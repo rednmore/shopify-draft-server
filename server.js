@@ -6,7 +6,7 @@ require('dotenv').config();
 
 const app = express();
 
-// 🔐 Autorise uniquement votre domaine Shopify
+// ✅ Autoriser uniquement votre domaine Shopify
 const ALLOWED_ORIGIN = "https://www.xn--zy-gka.com";
 
 app.use(cors({
@@ -24,8 +24,14 @@ app.get('/list-customers', async (req, res) => {
   console.log("🔒 Clé attendue :", serverKey);
 
   if (!clientKey || clientKey !== serverKey) {
-    console.warn("⛔ Accès refusé à /list-customers");
+    console.warn("⛔ Accès refusé à /list-customers (clé)");
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
+  }
+
+  const origin = req.get('origin');
+  if (origin !== ALLOWED_ORIGIN) {
+    console.warn("⛔ Accès refusé à /list-customers (origine):", origin);
+    return res.status(403).json({ message: "Origine non autorisée" });
   }
 
   try {
@@ -92,8 +98,14 @@ app.post('/create-draft-order', async (req, res) => {
   console.log("🔒 Clé attendue :", serverKey);
 
   if (!clientKey || clientKey !== serverKey) {
-    console.warn("⛔ Accès refusé à /create-draft-order");
+    console.warn("⛔ Accès refusé à /create-draft-order (clé)");
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
+  }
+
+  const origin = req.get('origin');
+  if (origin !== ALLOWED_ORIGIN) {
+    console.warn("⛔ Accès refusé à /create-draft-order (origine):", origin);
+    return res.status(403).json({ message: "Origine non autorisée" });
   }
 
   const { customer_id, items } = req.body;
