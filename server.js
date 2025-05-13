@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
+// ✅ Lancement unique du script pour créer le webhook (protection intégrée)
+require('./scripts/register-webhook')(); // ← ajoutez cette ligne
 
 // ✅ Liste des origines autorisées (versions encodée et non-encodée du domaine)
 const ALLOWED_ORIGINS = [
