@@ -5,6 +5,8 @@ const fetch = require('node-fetch');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+
+const syncCustomerData = require('./routes/sync-customer-data');
 const app = express();
 // ✅ Lancement unique du script pour créer le webhook (protection intégrée)
 require('./scripts/register-webhook'); // ← ajoutez cette ligne
@@ -37,6 +39,7 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 app.use(globalLimiter);
+app.use('/sync-customer-data', syncCustomerData);
 
 // ✅ Limiteur spécifique sur /create-draft-order
 const orderLimiter = rateLimit({
