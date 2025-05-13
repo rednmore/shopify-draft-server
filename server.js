@@ -67,6 +67,10 @@ app.get('/list-customers', async (req, res) => {
     console.warn("⛔ Accès refusé à /list-customers (clé)");
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
   }
+} catch (err) {
+  console.error("❌ Erreur dans /list-customers :", err.message);
+  res.status(500).json({ message: "Erreur serveur : " + err.message });
+}
 
 if (origin && !ALLOWED_ORIGINS.includes(origin)) {
   console.warn("⛔ Accès refusé à ...", origin);
