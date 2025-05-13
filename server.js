@@ -16,10 +16,13 @@ app.use(cors({
 app.use(bodyParser.json());
 
 app.use((req, res, next) => {
-  const clientKey =
-    req.headers["x-api-key"] ||    // ✅ clé envoyée en header
-    req.query.key ||               // ✅ clé envoyée en ?key=...
-    null;
+  let clientKey = req.headers["x-api-key"];
+
+  // Essai de récupération dans la query string
+  if (!clientKey && req.url.includes('?')) {
+    const rawParams = new URLSearchParams(req.url.split('?')[1]);
+    clientKey = rawParams.get('key');
+  }
 
   const serverKey = process.env.API_SECRET;
 
