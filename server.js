@@ -68,10 +68,10 @@ app.get('/list-customers', async (req, res) => {
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
   }
 
-  if (!ALLOWED_ORIGINS.includes(origin)) {
-    console.warn("⛔ Accès refusé à /list-customers (origine):", origin);
-    return res.status(403).json({ message: "Origine non autorisée" });
-  }
+if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  console.warn("⛔ Accès refusé à ...", origin);
+  return res.status(403).json({ message: "Origine non autorisée" });
+}
 
   try {
     const r = await fetch(`https://${process.env.SHOPIFY_STORE}/admin/api/2023-10/customers.json?limit=100`, {
@@ -138,10 +138,10 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
     return res.status(403).json({ message: "Accès interdit (clé API invalide)" });
   }
 
-  if (!ALLOWED_ORIGINS.includes(origin)) {
-    console.warn("⛔ Accès refusé à /create-draft-order (origine):", origin);
-    return res.status(403).json({ message: "Origine non autorisée" });
-  }
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  console.warn("⛔ Accès refusé à ...", origin);
+  return res.status(403).json({ message: "Origine non autorisée" });
+}
 
   const { customer_id, items } = req.body;
   if (!customer_id || !items) {
