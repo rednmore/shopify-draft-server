@@ -17,8 +17,9 @@ app.use(bodyParser.json());
 
 app.use((req, res, next) => {
   const clientKey =
-    req.headers["x-api-key"] ||
-    req.query.key;
+    req.headers["x-api-key"] ||    // ✅ clé envoyée en header
+    req.query.key ||               // ✅ clé envoyée en ?key=...
+    null;
 
   const serverKey = process.env.API_SECRET;
 
@@ -32,6 +33,7 @@ app.use((req, res, next) => {
 
   next();
 });
+
 
 
 // 🔹 GET /list-customers
