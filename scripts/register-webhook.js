@@ -1,26 +1,20 @@
 require('dotenv').config();
 const axios = require('axios');
 
-const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL; // Doit être comme : "21qdxp-hd.myshopify.com"
-const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
+const BASE_URL = `https://${process.env.SHOPIFY_API_URL}`;
+const API_KEY = process.env.SHOPIFY_API_KEY;
 const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com/sync-customer-data';
 
-// 🔧 Helper pour construire les URL correctes
-function buildShopifyAdminUrl(path) {
-  return `https://${SHOPIFY_API_URL}/admin/api/2023-10${path}`;
-}
-
-if (!SHOPIFY_API_URL || !SHOPIFY_API_KEY) {
+if (!BASE_URL || !API_KEY) {
   console.error('❌ SHOPIFY_API_URL ou SHOPIFY_API_KEY est manquant.');
   process.exit(1);
 }
 
 async function registerCustomerCreateWebhook() {
   try {
-    console.log('🔎 Vérification des webhooks existants...');
-    const existing = await axios.get(buildShopifyAdminUrl('/webhooks.json'), {
+    const existing = await axios.get(`${BASE_URL}/admin/api/2023-10/webhooks.json`, {
       headers: {
-        'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+        'X-Shopify-Access-Token': API_KEY,
         'Content-Type': 'application/json'
       }
     });
@@ -30,13 +24,12 @@ async function registerCustomerCreateWebhook() {
     );
 
     if (found) {
-      console.log(`⚠️ Le webhook "customers/create" existe déjà (id: ${found.id}).`);
+      console.log(`⚠️ Webhook déjà existant (id: ${found.id}).`);
       return;
     }
 
-    console.log('📡 Enregistrement du webhook…');
     const response = await axios.post(
-      buildShopifyAdminUrl('/webhooks.json'),
+      `${BASE_URL}/admin/api/2023-10/webhooks.json`,
       {
         webhook: {
           topic: 'customers/create',
@@ -46,9 +39,8 @@ async function registerCustomerCreateWebhook() {
       },
       {
         headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-          'Content-Type': 'application/json',
-          'User-Agent': 'ShopifyWebhookClient/1.0'
+          'X-Shopify-Access-Token': API_KEY,
+          'Content-Type': 'application/json'
         }
       }
     );
