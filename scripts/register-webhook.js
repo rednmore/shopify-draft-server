@@ -5,6 +5,11 @@ const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com/sync-customer-data';
 
+// 🔧 Helper pour normaliser les URLs
+function normalizeUrl(url) {
+  return url.replace(/\/+$/, '').toLowerCase();
+}
+
 if (!SHOPIFY_API_URL || !SHOPIFY_API_KEY) {
   console.error('❌ SHOPIFY_API_URL ou SHOPIFY_API_KEY est manquant.');
   process.exit(1);
