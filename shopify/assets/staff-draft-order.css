@@ -37,6 +37,7 @@
   font-size: 16px;
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 /* Zone de saisie interne */
@@ -46,11 +47,22 @@
   background: transparent !important;
   padding: 0 !important;
   height: auto !important;
+  font-size: 16px !important; /* ✅ Uniformise la taille du texte sélectionné */
+  display: flex;
+  align-items: center;
+}
+
+/* Icône de loupe */
+.staff-draft-order-wrapper .ts-wrapper.single .ts-control::before {
+  content: '🔍';
+  font-size: 16px;
+  margin-right: 8px;
+  color: #888;
 }
 
 /* Champ de recherche */
 .staff-draft-order-wrapper .ts-wrapper.single .ts-control input {
-  font-size: 16px;
+  font-size: 16px !important; /* ✅ même taille que la sélection */
   padding: 6px;
   background: transparent;
 }
