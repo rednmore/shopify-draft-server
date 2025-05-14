@@ -1,0 +1,248 @@
+<div class="page-width">
+  <h1 class="title title--primary" style="margin-top: {{ section.settings.margin_top }}px;">
+    {{ page.title }}
+  </h1>
+</div>
+
+<div class="page-width">
+  <div class="grid grid--{{ section.settings.mobile_columns }}-col grid--{{ section.settings.desktop_columns }}-col-desktop">
+    {% for block in section.blocks %}
+      <div class="grid__item">
+        <div class="card" style="border: 1px solid #e1e1e1; padding: 1rem; text-align: center;">
+          {% if block.settings.image != blank %}
+            <div class="card__media">
+              <img
+                src="{{ block.settings.image | image_url: width: 600 }}"
+                alt="{{ block.settings.title | escape }}"
+                style="
+                  display: block;
+                  max-width: 280px;
+                  width: 100%;
+                  height: auto;
+                  border: 1px solid black;
+                  padding: 4px;
+                  margin: 0 auto;
+                "
+              >
+            </div>
+          {% endif %}
+
+          <div class="card__content">
+            <h2
+              style="
+                font-size: {{ section.settings.name_font_size }}px;
+                font-family: {{ section.settings.name_font_family }};
+                margin-top: {{ section.settings.image_to_name_spacing }}px;
+                margin-bottom: {{ section.settings.name_to_address_spacing }}px;
+              ">
+              {{ block.settings.title }}
+            </h2>
+
+            <p
+              style="
+                white-space: pre-line;
+                font-size: {{ section.settings.address_font_size }}px;
+                font-family: {{ section.settings.address_font_family }};
+                color: #555;
+                margin-top: 0;
+                margin-bottom: {{ section.settings.address_to_link_spacing | default: 6 }}px;
+              ">
+              {{ block.settings.address }}
+            </p>
+
+            {% if block.settings.link != blank %}
+              <a href="{{ block.settings.link }}" target="_blank"
+                style="
+                  font-size: {{ section.settings.link_font_size }}px;
+                  font-family: {{ section.settings.link_font_family }};
+                ">
+                View Location
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Reseller List",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "Top margin for page title (px)",
+      "min": 0,
+      "max": 200,
+      "step": 4,
+      "default": 40
+    },
+    {
+      "type": "select",
+      "id": "desktop_columns",
+      "label": "Number of resellers per row (desktop)",
+      "default": "3",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" },
+        { "value": "3", "label": "3" },
+        { "value": "4", "label": "4" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "mobile_columns",
+      "label": "Number of resellers per row (mobile)",
+      "default": "1",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "image_to_name_spacing",
+      "label": "Space between image and name (px)",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "name_to_address_spacing",
+      "label": "Space between reseller name and address (px)",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "address_to_link_spacing",
+      "label": "Space between address and map link (px)",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "default": 6
+    },
+    {
+      "type": "range",
+      "id": "name_font_size",
+      "label": "Shop name font size (px)",
+      "min": 12,
+      "max": 36,
+      "step": 1,
+      "default": 20
+    },
+    {
+      "type": "select",
+      "id": "name_font_family",
+      "label": "Shop name font family",
+      "default": "inherit",
+      "options": [
+        { "value": "inherit", "label": "Theme default" },
+        { "value": "Arial, sans-serif", "label": "Arial" },
+        { "value": "'Helvetica Neue', sans-serif", "label": "Helvetica Neue" },
+        { "value": "Georgia, serif", "label": "Georgia" },
+        { "value": "'Courier New', monospace", "label": "Courier New" },
+        { "value": "'Times New Roman', serif", "label": "Times New Roman" },
+        { "value": "'Trebuchet MS', sans-serif", "label": "Trebuchet MS" },
+        { "value": "'Lucida Sans Unicode', sans-serif", "label": "Lucida Sans" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "address_font_size",
+      "label": "Address font size (px)",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "default": 14
+    },
+    {
+      "type": "select",
+      "id": "address_font_family",
+      "label": "Address font family",
+      "default": "inherit",
+      "options": [
+        { "value": "inherit", "label": "Theme default" },
+        { "value": "Arial, sans-serif", "label": "Arial" },
+        { "value": "'Helvetica Neue', sans-serif", "label": "Helvetica Neue" },
+        { "value": "Georgia, serif", "label": "Georgia" },
+        { "value": "'Courier New', monospace", "label": "Courier New" },
+        { "value": "'Times New Roman', serif", "label": "Times New Roman" },
+        { "value": "'Trebuchet MS', sans-serif", "label": "Trebuchet MS" },
+        { "value": "'Lucida Sans Unicode', sans-serif", "label": "Lucida Sans" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "link_font_size",
+      "label": "Link font size (px)",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "default": 13
+    },
+    {
+      "type": "select",
+      "id": "link_font_family",
+      "label": "Link font family",
+      "default": "inherit",
+      "options": [
+        { "value": "inherit", "label": "Theme default" },
+        { "value": "Arial, sans-serif", "label": "Arial" },
+        { "value": "'Helvetica Neue', sans-serif", "label": "Helvetica Neue" },
+        { "value": "Georgia, serif", "label": "Georgia" },
+        { "value": "'Courier New', monospace", "label": "Courier New" },
+        { "value": "'Times New Roman', serif", "label": "Times New Roman" },
+        { "value": "'Trebuchet MS', sans-serif", "label": "Trebuchet MS" },
+        { "value": "'Lucida Sans Unicode', sans-serif", "label": "Lucida Sans" }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "type": "reseller",
+      "name": "Reseller",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image"
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Reseller name",
+          "default": "City Name Store"
+        },
+        {
+          "type": "textarea",
+          "id": "address",
+          "label": "Address and contact info",
+          "default": "123 Example Street\nZIP City"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Google Maps or Website Link"
+        }
+      ]
+    }
+  ],
+  "max_blocks": 50,
+  "presets": [
+    {
+      "name": "Reseller Locations",
+      "category": "Custom",
+      "blocks": []
+    }
+  ]
+}
+{% endschema %}
