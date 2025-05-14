@@ -1,1 +1,53 @@
+.client-combobox {
+  position: relative;
+  max-width: 500px;
+  margin-bottom: 20px;
+}
+
+.client-input {
+  width: 100%;
+  font-size: 16px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.suggestion-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-top: none;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.suggestion-list li {
+  padding: 10px 14px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.suggestion-list li:hover {
+  background-color: #f2f2f2;
+}
+
+.staff-order-button {
+  display: inline-block;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.staff-order-button:hover {
+  opacity: 0.9;
+}
 
