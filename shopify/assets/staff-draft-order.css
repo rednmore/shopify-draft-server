@@ -1,53 +1,122 @@
-.client-combobox {
-  position: relative;
-  max-width: 500px;
-  margin-bottom: 20px;
+/* ===== STAFF DRAFT ORDER - ZYO Style ===== */
+
+.staff-draft-order-container {
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.client-input {
-  width: 100%;
+.staff-draft-order-wrapper {
+  text-align: left;
+  padding: 0 20px;
+}
+
+/* Titre */
+.staff-draft-order-wrapper h2.h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+/* Label du sélecteur */
+.staff-draft-order-wrapper .field__label {
+  font-weight: 500;
   font-size: 16px;
-  padding: 10px;
+  margin-bottom: 8px;
+  display: block;
+  text-align: left;
+}
+
+/* --- TomSelect wrapper --- */
+.staff-draft-order-wrapper .ts-wrapper.single {
+  border: 2px solid #000000;
+  border-radius: 6px;
+  background-color: #ffffff;
+  height: 44px;
+  padding: 4px 8px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+}
+
+/* Zone de saisie interne */
+.staff-draft-order-wrapper .ts-wrapper .ts-control {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+
+/* Champ de recherche */
+.staff-draft-order-wrapper .ts-wrapper.single .ts-control input {
+  font-size: 16px;
+  padding: 6px;
+  background: transparent;
+}
+
+/* Dropdown */
+.staff-draft-order-wrapper .ts-dropdown {
+  font-size: 15px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-sizing: border-box;
-}
-
-.suggestion-list {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background-color: #fff;
-  border: 1px solid #ccc;
-  border-top: none;
   max-height: 200px;
   overflow-y: auto;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  z-index: 999;
 }
 
-.suggestion-list li {
-  padding: 10px 14px;
+/* Option dans la liste */
+.staff-draft-order-wrapper .ts-dropdown .option {
+  padding: 10px;
+  cursor: pointer;
+}
+
+.staff-draft-order-wrapper .ts-dropdown .option:hover,
+.staff-draft-order-wrapper .ts-dropdown .option.selected {
+  background-color: #f5f5f5;
+}
+
+/* Texte d’aide */
+.staff-draft-order-wrapper .rte {
+  font-size: 16px;
+  color: #555;
+  line-height: 1.6;
+  text-align: left;
+}
+
+/* Feedback */
+.staff-draft-order-wrapper #feedback {
   font-size: 15px;
+  font-weight: bold;
+  margin-top: 20px;
+  text-align: left;
+}
+
+/* Bouton principal */
+.staff-draft-order-wrapper .staff-order-button {
+  width: 100%;
+  height: 44px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 10px 20px;
   cursor: pointer;
+
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  transition: background-color 0.2s ease;
 }
 
-.suggestion-list li:hover {
-  background-color: #f2f2f2;
+.staff-draft-order-wrapper .staff-order-button:hover {
+  filter: brightness(0.95);
 }
 
-.staff-order-button {
-  display: inline-block;
-  text-align: center;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
+/* Texte sélectionné */
+.staff-draft-order-wrapper #selected-info {
+  font-size: 15px;
+  margin-top: 10px;
+  color: #222;
+  text-align: left;
 }
-
-.staff-order-button:hover {
-  opacity: 0.9;
-}
-
