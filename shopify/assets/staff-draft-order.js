@@ -1,45 +1,108 @@
- document.addEventListener("DOMContentLoaded", function () {
-  const selector = document.getElementById("client-selector");
+document.addEventListener("DOMContentLoaded", function () {
+  const select = document.getElementById("client-selector");
   const feedback = document.getElementById("feedback");
   const info = document.getElementById("selected-info");
-
   const API_KEY = "MacleDo1tRSTHEZ1298";
-  console.log("🔑 Clé API utilisée :", API_KEY);
+
+  if (!select || !feedback || !info) {
+    console.error("❌ Éléments requis non trouvés dans le DOM");
+    return;
+  }
 
   fetch("https://shopify-draft-server.onrender.com/list-customers?key=" + encodeURIComponent(API_KEY), {
     method: "GET",
     mode: "cors"
   })
-    .then(res => {
-      console.log("🌐 Statut réponse serveur :", res.status);
-      return res.json();
-    })
+    .then(res => res.json())
     .then(customers => {
-      console.log("📦 Clients reçus du backend :", customers);
-
       if (!Array.isArray(customers)) {
         feedback.innerHTML = "❌ Données client invalides.";
         return;
       }
 
-      selector.innerHTML = '<option value="">-- Choisir un client --</option>';
+      // Supprimer les options précédentes
+      select.innerHTML = "";
 
+      // Ajouter les nouvelles options
       customers.forEach(client => {
-        console.log("👤 Client affiché :", client);
-        const opt = document.createElement("option");
-        opt.value = client.id;
-        opt.textContent = client.label || `Client ${client.id}`;
-        selector.appendChild(opt);
+        const option = document.createElement("option");
+        option.value = client.id;
+        option.textContent = client.label || `Client ${client.id}`;
+        select.appendChild(option);
       });
+
+      // Initialiser TomSelect
+new TomSelect("#client-selector", {
+  placeholder: "Recherchez un client...",
+  maxOptions: 500,
+  allowEmptyOption: true,
+  persist: false,
+  closeAfterSelect: false,
+  hideSelected: false,
+  sortField: {
+    field: "text",
+    direction: "asc"
+  },
+  onItemAdd: function () {
+    // ✅ Garde la sélection, mais vide le champ de recherche visuelle
+    this.setTextboxValue('');       // ⬅️ Vide la zone de saisie
+    this.refreshOptions(false);     // ⬅️ Recharge les options proprement
+  },
+  render: {
+    item: function(data, escape) {
+      // ✅ Affiche uniquement le nom dans le champ sélectionné
+      return '<div>' + escape(data.text) + '</div>';
+    },
+    option: function(data, escape) {
+      return '<div>' + escape(data.text) + '</div>';
+    }
+  }
+});
+
+      feedback.innerHTML = ""; // On efface les erreurs
     })
     .catch(error => {
       console.error("❌ Erreur lors du chargement des clients :", error);
       feedback.innerHTML = "❌ Impossible de charger les clients.";
     });
 
-  selector.addEventListener("change", function () {
-    const selectedId = selector.value;
-    const selectedText = selector.options[selector.selectedIndex].text;
-    info.innerHTML = selectedId ? `👤 Client sélectionné : <strong>${selectedText}</strong>` : "";
+  // Écoute du bouton
+  document.getElementById("create-draft-order").addEventListener("click", async function () {
+    const selectedId = select.value;
+
+    if (!selectedId) {
+      feedback.innerHTML = "❌ Veuillez sélectionner un client.";
+      return;
+    }
+
+    feedback.innerHTML = "⏳ Création de la commande...";
+
+    try {
+      const cartRes = await fetch('/cart.js');
+      const cart = await cartRes.json();
+
+      const response = await fetch("https://shopify-draft-server.onrender.com/create-draft-order?key=" + encodeURIComponent(API_KEY), {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: selectedId,
+          items: cart.items.map(item => ({
+            variant_id: item.variant_id,
+            quantity: item.quantity
+          }))
+        })
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        feedback.innerHTML = `✅ Commande créée. <a href="${result.invoice_url}" target="_blank">Voir la facture</a>`;
+      } else {
+        feedback.innerHTML = `❌ Erreur : ${result.message}`;
+      }
+    } catch (e) {
+      console.error("❌ Erreur JS :", e);
+      feedback.innerHTML = "❌ Une erreur est survenue.";
+    }
   });
 });
