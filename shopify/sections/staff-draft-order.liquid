@@ -1,0 +1,266 @@
+<div class="page-width">
+  <h2 class="h2">{{ section.settings.page_title }}</h2>
+
+  <div style="margin-bottom: 20px;">
+    <label for="client-selector" class="field__label">{{ section.settings.select_label }}</label><br />
+
+    <select id="client-selector"
+            class="field__input"
+            style="
+              appearance: none;
+              background-color: {{ section.settings.select_bg }};
+              color: {{ section.settings.select_text }};
+              border: 1px solid {{ section.settings.select_border }};
+              border-radius: {{ section.settings.select_radius }}px;
+              padding: {{ section.settings.select_padding }};
+              height: {{ section.settings.select_height }};
+              width: {{ section.settings.button_width }};
+              font-size: 16px;
+              cursor: pointer;
+            ">
+      <option value="">Chargement des clients...</option>
+    </select>
+  </div>
+
+  {% if section.settings.show_help_text %}
+    <div class="rte" style="margin-bottom: 20px;">
+      {{ section.settings.help_text }}
+    </div>
+  {% endif %}
+
+  <div style="margin-top: 20px;">
+    <button id="create-draft-order"
+            class="button"
+            style="
+              background-color: {{ section.settings.button_bg }};
+              color: {{ section.settings.button_text }};
+              border: 1px solid {{ section.settings.button_border }};
+              border-radius: {{ section.settings.button_radius }}px;
+              padding: {{ section.settings.button_padding }};
+              font-size: {{ section.settings.button_font_size }}px;
+              font-weight: {{ section.settings.button_font_weight }};
+              width: {{ section.settings.button_width }};
+              height: {{ section.settings.button_height }};
+            ">
+      {{ section.settings.button_label }}
+    </button>
+  </div>
+
+  <div id="feedback"
+       class="body"
+       style="margin-top: 20px; font-weight: bold; color: {{ section.settings.feedback_color }};">
+  </div>
+
+  <div id="selected-info" class="body" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+ document.addEventListener("DOMContentLoaded", function () {
+  const selector = document.getElementById("client-selector");
+  const feedback = document.getElementById("feedback");
+  const info = document.getElementById("selected-info");
+
+  const API_KEY = "MacleDo1tRSTHEZ1298";
+  console.log("🔑 Clé API utilisée :", API_KEY);
+
+  fetch("https://shopify-draft-server.onrender.com/list-customers?key=" + encodeURIComponent(API_KEY), {
+    method: "GET",
+    mode: "cors"
+  })
+    .then(res => {
+      console.log("🌐 Statut réponse serveur :", res.status);
+      return res.json();
+    })
+    .then(customers => {
+      console.log("📦 Clients reçus du backend :", customers);
+
+      if (!Array.isArray(customers)) {
+        feedback.innerHTML = "❌ Données client invalides.";
+        return;
+      }
+
+      selector.innerHTML = '<option value="">-- Choisir un client --</option>';
+
+      customers.forEach(client => {
+        console.log("👤 Client affiché :", client);
+        const opt = document.createElement("option");
+        opt.value = client.id;
+        opt.textContent = client.label || `Client ${client.id}`;
+        selector.appendChild(opt);
+      });
+    })
+    .catch(error => {
+      console.error("❌ Erreur lors du chargement des clients :", error);
+      feedback.innerHTML = "❌ Impossible de charger les clients.";
+    });
+
+  selector.addEventListener("change", function () {
+    const selectedId = selector.value;
+    const selectedText = selector.options[selector.selectedIndex].text;
+    info.innerHTML = selectedId ? `👤 Client sélectionné : <strong>${selectedText}</strong>` : "";
+  });
+});
+
+</script>
+
+{% schema %}
+{
+  "name": "Commande Staff",
+  "settings": [
+    {
+      "type": "text",
+      "id": "page_title",
+      "label": "Titre de la page",
+      "default": "Créer une commande pour un client"
+    },
+
+    // ---- LABEL DU SELECTEUR ----
+    {
+      "type": "text",
+      "id": "select_label",
+      "label": "Texte du menu déroulant",
+      "default": "Sélectionner un client :"
+    },
+
+    // ---- STYLES SÉLECTEUR CLIENT (style bouton secondaire) ----
+    {
+      "type": "color",
+      "id": "select_bg",
+      "label": "Couleur de fond du sélecteur",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "select_text",
+      "label": "Couleur du texte du sélecteur",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "select_border",
+      "label": "Couleur de bordure du sélecteur",
+      "default": "#cccccc"
+    },
+    {
+      "type": "range",
+      "id": "select_radius",
+      "label": "Arrondi du sélecteur (px)",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "text",
+      "id": "select_padding",
+      "label": "Padding interne (ex: 10px)",
+      "default": "10px"
+    },
+    {
+      "type": "text",
+      "id": "select_height",
+      "label": "Hauteur du sélecteur (ex: 44px)",
+      "default": "44px"
+    },
+
+    // ---- TEXTE D’AIDE ----
+    {
+      "type": "checkbox",
+      "id": "show_help_text",
+      "label": "Afficher un texte d’aide",
+      "default": true
+    },
+    {
+      "type": "richtext",
+      "id": "help_text",
+      "label": "Texte d’aide",
+      "default": "<p>Utilisez cette interface pour créer une commande pour un client existant.</p>"
+    },
+
+    // ---- BOUTON CRÉATION (style Dawn) ----
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Texte du bouton de commande",
+      "default": "Créer la commande"
+    },
+    {
+      "type": "color",
+      "id": "button_bg",
+      "label": "Couleur de fond du bouton",
+      "default": "#3a7cff"
+    },
+    {
+      "type": "color",
+      "id": "button_text",
+      "label": "Couleur du texte du bouton",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "button_border",
+      "label": "Couleur de bordure du bouton",
+      "default": "#3a7cff"
+    },
+    {
+      "type": "range",
+      "id": "button_radius",
+      "label": "Arrondi du bouton (px)",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "text",
+      "id": "button_padding",
+      "label": "Padding du bouton (ex: 10px 20px)",
+      "default": "10px 20px"
+    },
+    {
+      "type": "range",
+      "id": "button_font_size",
+      "label": "Taille de la police (px)",
+      "min": 12,
+      "max": 30,
+      "step": 1,
+      "default": 16
+    },
+    {
+      "type": "select",
+      "id": "button_font_weight",
+      "label": "Épaisseur du texte",
+      "default": "normal",
+      "options": [
+        { "value": "normal", "label": "Normal" },
+        { "value": "bold", "label": "Gras" },
+        { "value": "lighter", "label": "Fin" }
+      ]
+    },
+
+    // ---- LARGEUR COMMUNE ----
+    {
+      "type": "text",
+      "id": "button_width",
+      "label": "Largeur du bouton ET du sélecteur (ex: auto, 100%, 300px)",
+      "default": "100%"
+    },
+
+    // ---- FEEDBACK ----
+    {
+      "type": "color",
+      "id": "feedback_color",
+      "label": "Couleur du message de retour",
+      "default": "#000000"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Commande staff",
+      "category": "Custom"
+    }
+  ]
+}
+{% endschema %}
+
+
