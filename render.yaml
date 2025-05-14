@@ -1,0 +1,21 @@
+# Exported from Render on 2025-05-14T07:25:11Z
+services:
+- type: web
+  name: shopify-draft-server
+  runtime: node
+  repo: https://github.com/rednmore/shopify-draft-server
+  plan: free
+  envVars:
+  - key: SHOPIFY_API_URL
+    sync: false
+  - key: SHOPIFY_API_KEY
+    sync: false
+  - key: PORT
+    sync: false
+  - key: API_SECRET
+    sync: false
+  region: oregon
+  buildCommand: npm install
+  startCommand: node server.js
+  autoDeployTrigger: "off"
+version: "1"
