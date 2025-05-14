@@ -1,118 +1,139 @@
 {{ 'staff-draft-order.css' | asset_url | stylesheet_tag }}
+{{ 'tom-select.css' | asset_url | stylesheet_tag }}
+{{ 'tom-select.complete.min.js' | asset_url | script_tag }}
 {{ 'staff-draft-order.js' | asset_url | script_tag }}
 
-<div class="page-width">
-  <h2 class="h2">{{ section.settings.page_title }}</h2>
+<div class="staff-draft-order-container">
+  <div class="staff-draft-order-wrapper">
 
-  <div class="client-combobox">
-    <label for="client-input" class="field__label">{{ section.settings.select_label }}</label><br />
-    <input type="text"
-           id="client-input"
-           class="client-input"
-           placeholder="Recherchez un client..."
-           autocomplete="off">
-    <ul id="client-suggestions" class="suggestion-list"></ul>
-    <input type="hidden" id="client-id">
-  </div>
+    <!-- TITRE -->
+    <h2 class="h2">{{ section.settings.page_title }}</h2>
 
-  {% if section.settings.show_help_text %}
-    <div class="rte" style="margin-bottom: 20px;">
-      {{ section.settings.help_text }}
+    <!-- TEXTE D’AIDE -->
+    {% if section.settings.show_help_text %}
+      <div class="rte">
+        {{ section.settings.help_text }}
+      </div>
+    {% endif %}
+
+    <!-- SÉLECTEUR -->
+    <div class="client-combobox" style="margin-bottom: 20px;">
+      <label for="client-selector" class="field__label">{{ section.settings.select_label }}</label>
+      <select id="client-selector" class="client-selector" style="width: 100%;">
+        <option value="">Loading clients...</option>
+      </select>
     </div>
-  {% endif %}
 
-  <div style="margin-top: 20px;">
-    <button id="create-draft-order"
-            class="button staff-order-button">
-      {{ section.settings.button_label }}
-    </button>
+    <!-- CSS VAR STYLES -->
+    <style>
+      :root {
+        --button-bg: {{ section.settings.button_bg }};
+        --button-text: {{ section.settings.button_text }};
+        --button-border: {{ section.settings.button_border }};
+      }
+    </style>
+
+    <!-- BOUTON -->
+    <div>
+      <button id="create-draft-order"
+              class="button staff-order-button"
+              style="
+                width: {{ section.settings.button_width }};
+                height: {{ section.settings.button_height }};
+                border-radius: {{ section.settings.button_radius }}px;
+                padding: {{ section.settings.button_padding }};
+                font-size: {{ section.settings.button_font_size }}px;
+                font-weight: {{ section.settings.button_font_weight }};
+              ">
+        {{ section.settings.button_label }}
+      </button>
+    </div>
+
+    <!-- MESSAGES -->
+    <div id="feedback" class="body"></div>
+    <div id="selected-info" class="body"></div>
+
   </div>
-
-  <div id="feedback"
-       class="body"
-       style="margin-top: 20px; font-weight: bold; color: {{ section.settings.feedback_color }};">
-  </div>
-
-  <div id="selected-info" class="body" style="margin-top: 20px;"></div>
 </div>
 
 {% schema %}
 {
-  "name": "Commande Staff",
+  "name": "Staff Order",
+  "tag": "section",
   "settings": [
     {
       "type": "text",
       "id": "page_title",
-      "label": "Titre de la page",
-      "default": "Créer une commande pour un client"
+      "label": "Page title",
+      "default": "Create an order for a specific customer"
     },
     {
       "type": "text",
       "id": "select_label",
-      "label": "Texte du champ de recherche",
-      "default": "Sélectionner un client :"
+      "label": "Client selector label",
+      "default": "Select a client:"
     },
     {
       "type": "color",
       "id": "feedback_color",
-      "label": "Couleur du message de retour",
+      "label": "Feedback message color",
       "default": "#000000"
     },
     {
       "type": "checkbox",
       "id": "show_help_text",
-      "label": "Afficher un texte d’aide",
+      "label": "Show help text",
       "default": true
     },
     {
       "type": "richtext",
       "id": "help_text",
-      "label": "Texte d’aide",
-      "default": "<p>Utilisez cette interface pour créer une commande pour un client existant.</p>"
+      "label": "Help text",
+      "default": "<p>Use this interface to create an order for an existing customer.</p>"
     },
     {
       "type": "text",
       "id": "button_label",
-      "label": "Texte du bouton de commande",
-      "default": "Créer la commande"
+      "label": "Button text",
+      "default": "Create order"
     },
     {
       "type": "color",
       "id": "button_bg",
-      "label": "Couleur de fond du bouton",
-      "default": "#3a7cff"
+      "label": "Button background color",
+      "default": "#e6e6e6"
     },
     {
       "type": "color",
       "id": "button_text",
-      "label": "Couleur du texte du bouton",
-      "default": "#ffffff"
+      "label": "Button text color",
+      "default": "#000000"
     },
     {
       "type": "color",
       "id": "button_border",
-      "label": "Couleur de bordure du bouton",
-      "default": "#3a7cff"
+      "label": "Button border color",
+      "default": "#000000"
     },
     {
       "type": "range",
       "id": "button_radius",
-      "label": "Arrondi du bouton (px)",
+      "label": "Button border radius (px)",
       "min": 0,
       "max": 20,
       "step": 1,
-      "default": 4
+      "default": 6
     },
     {
       "type": "text",
       "id": "button_padding",
-      "label": "Padding du bouton (ex: 10px 20px)",
+      "label": "Button padding (e.g. 10px 20px)",
       "default": "10px 20px"
     },
     {
       "type": "range",
       "id": "button_font_size",
-      "label": "Taille de la police (px)",
+      "label": "Font size (px)",
       "min": 12,
       "max": 30,
       "step": 1,
@@ -121,30 +142,30 @@
     {
       "type": "select",
       "id": "button_font_weight",
-      "label": "Épaisseur du texte",
+      "label": "Font weight",
       "default": "normal",
       "options": [
         { "value": "normal", "label": "Normal" },
-        { "value": "bold", "label": "Gras" },
-        { "value": "lighter", "label": "Fin" }
+        { "value": "bold", "label": "Bold" },
+        { "value": "lighter", "label": "Light" }
       ]
     },
     {
       "type": "text",
       "id": "button_width",
-      "label": "Largeur du bouton (ex: auto, 100%, 300px)",
+      "label": "Button width (e.g. auto, 100%, 300px)",
       "default": "100%"
     },
     {
       "type": "text",
       "id": "button_height",
-      "label": "Hauteur du bouton (ex: 44px)",
+      "label": "Button height (e.g. 44px)",
       "default": "44px"
     }
   ],
   "presets": [
     {
-      "name": "Commande staff",
+      "name": "Staff order",
       "category": "Custom"
     }
   ]
