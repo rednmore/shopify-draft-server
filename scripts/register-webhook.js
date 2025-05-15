@@ -3,7 +3,7 @@ const axios = require('axios');
 
 const BASE_URL = `https://${process.env.SHOPIFY_API_URL}`;
 const API_KEY = process.env.SHOPIFY_API_KEY;
-const WEBHOOK_ADDRESS = 'https://shopify-draft-server.onrender.com/sync-customer-data';
+const WEBHOOK_ADDRESS = 'https://shopify-test-server-05d9.onrender.com/sync-customer-data';
 
 if (!BASE_URL || !API_KEY) {
   console.error('❌ SHOPIFY_API_URL ou SHOPIFY_API_KEY est manquant.');
