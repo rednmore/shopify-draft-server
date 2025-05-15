@@ -5,6 +5,9 @@ const fetch = require('node-fetch');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// server.js (en haut du fichier)
+const COPY_TO_ADDRESS = process.env.COPY_TO_ADDRESS || 'info@rednmore.com';
+
 const syncCustomerData = require('./routes/sync-customer-data');
 require('./scripts/register-webhook');
 
@@ -167,14 +170,46 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 
     const id = draft.draft_order.id;
 
-    await fetch(`${shopifyBaseUrl}/draft_orders/${id}/send_invoice.json`, {
+     // ── Après avoir récupéré `draft.draft_order.id` et `draft.draft_order.invoice_url` ──
+
+  
+  // 1) Récupérer l’email du client
+  const custRes = await fetch(
+    `${shopifyBaseUrl}/customers/${customer_id}.json`,
+    {
+      headers: {
+        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+        "Content-Type": "application/json"
+      }
+    }
+  );
+  const custData      = await custRes.json();
+  const customerEmail = custData.customer?.email || '';
+
+  // 2) Construire la liste des destinataires (client + info@rednmore.com)
+  const toList = [customerEmail, COPY_TO_ADDRESS]
+    .filter(Boolean)
+    .join(',');
+
+  // 3) Envoyer l’invoice via l’API Shopify au client + CC
+  await fetch(
+    `${shopifyBaseUrl}/draft_orders/${id}/send_invoice.json`,
+    {
       method: 'POST',
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ draft_order_invoice: {} })
-    });
+      body: JSON.stringify({
+        draft_invoice: {
+          to:             toList,
+          subject:        "Votre facture de commande",
+          custom_message: "Merci pour votre commande ! Voici votre facture."
+        }
+      })
+    }
+  );
+
 
     res.json({ invoice_url: draft.draft_order.invoice_url });
   } catch (err) {
