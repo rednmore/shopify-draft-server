@@ -1,6 +1,4 @@
 // server.js
-console.log('🔍 SHOPIFY_API_URL =', JSON.stringify(process.env.SHOPIFY_API_URL));
-console.log('🔍 SHOPIFY_API_KEY =', JSON.stringify(process.env.SHOPIFY_API_KEY));
 
 const express    = require('express');
 const bodyParser = require('body-parser');
