@@ -207,7 +207,8 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
   }
 });
 
-// 👇 Envoi email
+// Envoi facture par email…
+
 app.post('/send-order-email', async (req, res) => {
   const { customer_id, invoice_url, cc } = req.body;
   if (!customer_id || !invoice_url) {
@@ -215,7 +216,7 @@ app.post('/send-order-email', async (req, res) => {
   }
 
   try {
-    // 1) Récupérer l'email du client
+    // 1) Récupérer l’email du client
     const custRes = await fetch(
       `${shopifyBaseUrl}/customers/${customer_id}.json`,
       {
@@ -225,16 +226,23 @@ app.post('/send-order-email', async (req, res) => {
         }
       }
     );
-    const custData = await custRes.json();
+    const custData      = await custRes.json();
     const customerEmail = custData.customer?.email;
     if (!customerEmail) {
-      throw new Error('Email client introuvable');
+      throw new Error('Customer email not found');
     }
 
-    // 2) Envoi de l’email — adapte selon ta méthode (SendGrid, Mailgun, etc.)
-    // Exemple minimal avec Shopify Admin API (uniquement invoice, pas emailing custom) :
+    // 2) Extraire l’ID de la draft depuis invoice_url
+    //    on suppose que l’URL contient '/invoices/<draftId>'
+    const match = invoice_url.match(/\/invoices\/([^/?]+)/);
+    if (!match) {
+      throw new Error('Cannot extract draft order ID from invoice_url');
+    }
+    const draftId = match[1];
+
+    // 3) Envoyer la facture via l’API Shopify au client + CC
     await fetch(
-      `${shopifyBaseUrl}/draft_orders/${/* à extraire de invoice_url ou stocker au client */ }/send_invoice.json`,
+      `${shopifyBaseUrl}/draft_orders/${draftId}/send_invoice.json`,
       {
         method: 'POST',
         headers: {
@@ -251,7 +259,7 @@ app.post('/send-order-email', async (req, res) => {
       }
     );
 
-    // 3) Réponse OK
+    // 4) Tout s’est bien passé
     res.json({ success: true });
   } catch (err) {
     console.error('❌ /send-order-email error:', err);
