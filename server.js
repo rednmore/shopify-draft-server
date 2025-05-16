@@ -230,23 +230,28 @@ app.post('/send-order-email', async (req, res) => {
         }
       }
     );
-    const custData      = await custRes.json();
+    const custData = await custRes.json();
+
+    // log pour debug
+    console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
+
     const customerEmail = custData.customer?.email;
     if (!customerEmail) {
-      throw new Error('Customer email not found');
+      console.error(`❌ Email client introuvable pour customer_id=${customer_id}`);
+      return res.status(404).json({ message: 'Customer email not found' });
     }
 
-    // 2) Extraire l’ID de la draft depuis invoice_url
-    //    on suppose que l’URL contient '/invoices/<draftId>'
-    const match = invoice_url.match(/\/invoices\/([^/?]+)/);
-    if (!match) {
-      throw new Error('Cannot extract draft order ID from invoice_url');
-    }
-    const draftId = match[1];
+    // 2) Extraire l’ID de la draft_order depuis invoice_url
+    //    invoice_url est du genre https://votreshop/.../draft_orders/ID/send_invoice
+    //    On peut faire :
+    const parts = invoice_url.split('/');
+    const draftOrderId = parts[parts.indexOf('invoices') - 1] || parts.pop();
+    // ou, si invoice_url pointe vers /draft_orders/:id/invoices/:token :
+    // const draftOrderId = parts[parts.indexOf('draft_orders') + 1];
 
-    // 3) Envoyer la facture via l’API Shopify au client + CC
+    // 3) Envoyer l’email via Shopify Admin API (votre endpoint peut varier)
     await fetch(
-      `${shopifyBaseUrl}/draft_orders/${draftId}/send_invoice.json`,
+      `${shopifyBaseUrl}/draft_orders/${draftOrderId}/send_invoice.json`,
       {
         method: 'POST',
         headers: {
@@ -255,22 +260,21 @@ app.post('/send-order-email', async (req, res) => {
         },
         body: JSON.stringify({
           draft_invoice: {
-            to:      [customerEmail, ...cc].join(','),
-            subject: "Your order invoice",
-            custom_message: "Thank you for your order!"
+            to:             [customerEmail, ...cc].join(','),
+            subject:        "Votre facture de commande",
+            custom_message: "Merci pour votre commande !"
           }
         })
       }
     );
 
-    // 4) Tout s’est bien passé
+    // 4) Répondre OK
     res.json({ success: true });
   } catch (err) {
     console.error('❌ /send-order-email error:', err);
     res.status(500).json({ message: err.message });
   }
 });
-
 // Démarrage du serveur
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
