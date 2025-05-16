@@ -207,6 +207,58 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
   }
 });
 
+// 👇 Envoi email
+app.post('/send-order-email', async (req, res) => {
+  const { customer_id, invoice_url, cc } = req.body;
+  if (!customer_id || !invoice_url) {
+    return res.status(400).json({ message: 'Missing customer_id or invoice_url' });
+  }
+
+  try {
+    // 1) Récupérer l'email du client
+    const custRes = await fetch(
+      `${shopifyBaseUrl}/customers/${customer_id}.json`,
+      {
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    const custData = await custRes.json();
+    const customerEmail = custData.customer?.email;
+    if (!customerEmail) {
+      throw new Error('Email client introuvable');
+    }
+
+    // 2) Envoi de l’email — adapte selon ta méthode (SendGrid, Mailgun, etc.)
+    // Exemple minimal avec Shopify Admin API (uniquement invoice, pas emailing custom) :
+    await fetch(
+      `${shopifyBaseUrl}/draft_orders/${/* à extraire de invoice_url ou stocker au client */ }/send_invoice.json`,
+      {
+        method: 'POST',
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          draft_invoice: {
+            to:      [customerEmail, ...cc].join(','),
+            subject: "Your order invoice",
+            custom_message: "Thank you for your order!"
+          }
+        })
+      }
+    );
+
+    // 3) Réponse OK
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ /send-order-email error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Démarrage du serveur
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
