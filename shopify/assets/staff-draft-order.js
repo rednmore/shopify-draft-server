@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const BASE_URL       = "https://shopify-test-server-05d9.onrender.com;"
+  const BASE_URL       = "https://shopify-test-server-05d9.onrender.com";
   const API_KEY        = "MacleDo1tRSTHEZ1298";
-  const EMAIL_ENDPOINT = ${BASE_URL}/send-order-email";
+  const EMAIL_ENDPOINT = `${BASE_URL}/send-order-email`;
   const EXPIRY_MS      = 24 * 60 * 60 * 1000; // 24h
 
   document.querySelectorAll(".staff-draft-order-section").forEach(section => {
@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify({
-              customer_id:  selectedCustomerId,
+              customer_id: selectedCustomerId,
               invoice_url,
               cc:           ["info@rednmore.com"]
             })
@@ -144,7 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const cart = await (await fetch("/cart.js")).json();
         const resp = await fetch(
-          `https://shopify-test-server-05d9.onrender.com/create-draft-order?key=${encodeURIComponent(API_KEY)}`,
+          `${BASE_URL}/create-draft-order?key=${encodeURIComponent(API_KEY)}`,
           {
             method:  "POST",
             mode:    "cors",
