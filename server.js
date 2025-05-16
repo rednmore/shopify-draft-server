@@ -14,6 +14,10 @@ const syncCustomerData = require('./routes/sync-customer-data');
 require('./scripts/register-webhook');
 
 const app = express();
+
+// ─── Faire confiance au proxy de Render pour X-Forwarded-* ───
+app.set('trust proxy', 1);
+
 const ALLOWED_ORIGINS = [
   "https://www.xn--zy-gka.com",
   "https://www.zyö.com"
