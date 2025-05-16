@@ -1,9 +1,7 @@
-// assets/staff-draft-order.js
-
 document.addEventListener("DOMContentLoaded", () => {
-  const BASE_URL       = "https://shopify-test-server-05d9.onrender.com";
+  const BASE_URL       = "https://shopify-test-server-05d9.onrender.com;"
   const API_KEY        = "MacleDo1tRSTHEZ1298";
-  const EMAIL_ENDPOINT = `${BASE_URL}/send-order-email`;
+  const EMAIL_ENDPOINT = ${BASE_URL}/send-order-email";
   const EXPIRY_MS      = 24 * 60 * 60 * 1000; // 24h
 
   document.querySelectorAll(".staff-draft-order-section").forEach(section => {
@@ -14,17 +12,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // clés & textes dynamiques
-    const lsKey            = `staffDraftOrder:${sectionId}`;
-    const selectEl         = section.querySelector("select.client-selector");
-    const feedbackEl       = section.querySelector(".feedback");
-    const createBtn        = section.querySelector("button.staff-order-button");
-    const placeholderText  = section.dataset.placeholder      || "Search for opticians…";
-    const pleaseSelectText = section.dataset.pleaseSelectCustomerText || "Please select a customer";
-    const creatingText     = section.dataset.creatingText    || "Creating…";
-    const validateSendText = section.dataset.validateSendText|| "Click to validate & send order by email";
-    const sendingText      = section.dataset.sendingText     || "Sending…";
-    const sendErrorText    = section.dataset.sendErrorText   || "Error, retry";
-    const sentText         = section.dataset.sentText        || "Sent!";
+    const lsKey                = `staffDraftOrder:${sectionId}`;
+    const selectEl             = section.querySelector("select.client-selector");
+    const feedbackEl           = section.querySelector(".feedback");
+    const createBtn            = section.querySelector("button.staff-order-button");
+    const placeholderText      = section.dataset.placeholder || "Search for opticians…";
+    const pleaseSelectText     = section.dataset.pleaseSelectCustomerText || "Please select a customer";
+    const creatingText         = section.dataset.creatingText || "Creating…";
+    const validateSendText     = section.dataset.validateSendText || "Click to validate & send order by email";
+    const sendingText          = section.dataset.sendingText || "Sending…";
+    const sendErrorText        = section.dataset.sendErrorText || "Error, retry";
+    const sentText             = section.dataset.sentText || "Sent!";
 
     let selectedCustomerId = null;
 
@@ -47,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify({
-              customer_id: selectedCustomerId,
+              customer_id:  selectedCustomerId,
               invoice_url,
               cc:           ["info@rednmore.com"]
             })
@@ -104,8 +102,9 @@ document.addEventListener("DOMContentLoaded", () => {
       },
 
       load(query, cb) {
+        // on recharge même si query vide
         fetch(
-          `${BASE_URL}/list-customers?key=${encodeURIComponent(API_KEY)}&q=${encodeURIComponent(query)}`,
+       `${BASE_URL}/list-customers?key=${encodeURIComponent(API_KEY)}&q=${encodeURIComponent(query)}`,
           { mode: "cors" }
         )
           .then(r => r.json())
@@ -145,7 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const cart = await (await fetch("/cart.js")).json();
         const resp = await fetch(
-          `${BASE_URL}/create-draft-order?key=${encodeURIComponent(API_KEY)}`,
+          `https://shopify-test-server-05d9.onrender.com/create-draft-order?key=${encodeURIComponent(API_KEY)}`,
           {
             method:  "POST",
             mode:    "cors",
@@ -161,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // on stocke l’état pending
         localStorage.setItem(lsKey, JSON.stringify({
-          ts:          Date.now(),
+          ts: Date.now(),
           invoice_url: result.invoice_url
         }));
 
