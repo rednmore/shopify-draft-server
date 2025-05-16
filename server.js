@@ -212,67 +212,38 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 });
 
 // Envoi facture par email…
-
 app.post('/send-order-email', async (req, res) => {
-  const { customer_id, invoice_url, cc } = req.body;
-  if (!customer_id || !invoice_url) {
-    return res.status(400).json({ message: 'Missing customer_id or invoice_url' });
+  const { invoice_url } = req.body;
+  if (!invoice_url) {
+    return res.status(400).json({ message: 'Missing invoice_url' });
   }
 
+  // Extraire l’ID de la draft_order depuis invoice_url
+  // Ex : https://votreshop/.../draft_orders/123456789/invoices/abcdef…
+  const match = invoice_url.match(/draft_orders\/(\d+)\//);
+  if (!match) {
+    return res.status(400).json({ message: 'Invalid invoice_url' });
+  }
+  const draftOrderId = match[1];
+
   try {
-    // 1) Récupérer l’email du client
-    const custRes = await fetch(
-      `${shopifyBaseUrl}/customers/${customer_id}.json`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    const custData = await custRes.json();
-
-    // log pour debug
-    console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
-
-    const customerEmail = custData.customer?.email;
-    if (!customerEmail) {
-      console.error(`❌ Email client introuvable pour customer_id=${customer_id}`);
-      return res.status(404).json({ message: 'Customer email not found' });
-    }
-
-    // 2) Extraire l’ID de la draft_order depuis invoice_url
-    //    invoice_url est du genre https://votreshop/.../draft_orders/ID/send_invoice
-    //    On peut faire :
-    const parts = invoice_url.split('/');
-    const draftOrderId = parts[parts.indexOf('invoices') - 1] || parts.pop();
-    // ou, si invoice_url pointe vers /draft_orders/:id/invoices/:token :
-    // const draftOrderId = parts[parts.indexOf('draft_orders') + 1];
-
-    // 3) Envoyer l’email via Shopify Admin API (votre endpoint peut varier)
+    // On laisse Shopify envoyer l’email au client inscrit sur cette draft order
     await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftOrderId}/send_invoice.json`,
       {
         method: 'POST',
         headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Content-Type": "application/json"
+          'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          draft_invoice: {
-            to:             [customerEmail, ...cc].join(','),
-            subject:        "Votre facture de commande",
-            custom_message: "Merci pour votre commande !"
-          }
-        })
+        // corps vide : Shopify utilise l'email du customer enregistré
+        body: JSON.stringify({ draft_order_invoice: {} })
       }
     );
-
-    // 4) Répondre OK
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     console.error('❌ /send-order-email error:', err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 // Démarrage du serveur
