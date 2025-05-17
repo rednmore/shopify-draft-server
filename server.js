@@ -229,6 +229,61 @@ app.post('/complete-draft-order', async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
+// =========================================
+//  8.2. ROUTE POST : /send-order-confirmation
+//  Envoie l’email de confirmation de commande (order) au client + copie interne
+// =========================================
+app.post('/send-order-confirmation', async (req, res) => {
+  const clientKey = req.headers["x-api-key"] || req.query.key;
+  if (!clientKey || clientKey !== process.env.API_SECRET) {
+    return res.status(403).json({ message: "Clé API invalide" });
+  }
+
+  const { customer_id, order_id, cc } = req.body;
+  if (!customer_id || !order_id) {
+    return res.status(400).json({ message: "Missing customer_id or order_id" });
+  }
+
+  try {
+   // 1) Récupérer l’email du client
+    const respCust = await fetch(
+      `${shopifyBaseUrl}/customers/${customer_id}.json`,
+      { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY } }
+    );
+    const custData     = await respCust.json();
+    const customerEmail = custData.customer?.email;
+
+    // 2) Construire la liste des destinataires
+    const toList = [];
+    if (customerEmail) toList.push(customerEmail);
+    else console.warn("⚠️ Pas d’email client, j’envoie quand même à l’interne");
+    if (Array.isArray(cc)) toList.push(...cc);
+
+    // 3) Appeler l’API Shopify pour envoyer le reçu (order confirmation)
+    await fetch(
+      `${shopifyBaseUrl}/orders/${order_id}/send_receipt.json`,
+      {
+        method: 'POST',
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: {
+            to:              toList.join(','),
+            subject:         "Votre confirmation de commande",
+            custom_message:  "Merci pour votre commande !"
+          }
+        })
+     }
+   );
+
+  return res.json({ success: true });
+  } catch (err) {
+    console.error("❌ /send-order-confirmation error:", err);
+    return res.status(500).json({ message: err.message });
+  }
+});
 
 // =========================================
 // 9. ROUTE POST : /send-order-email
