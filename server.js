@@ -175,13 +175,32 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
         }
       }
     );
-    const custData      = await custRes.json();
-    const customerEmail = custData.customer?.email || '';
+// 1) Récupérer l’email du client
+  const custRes = await fetch(`${shopifyBaseUrl}/customers/${customer_id}.json`, {
+    headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY }
+  });
+  const custData      = await custRes.json();
+  console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
+  const customerEmail = custData.customer?.email;
 
-    // Construire la liste des destinataires
-    const toList = [customerEmail, COPY_TO_ADDRESS]
-      .filter(Boolean)
-      .join(',');
+  // 2) Construire la liste des destinataires
+  const toList = [];
+  if (customerEmail) {
+    toList.push(customerEmail);
+  } else {
+    console.warn('⚠️ Pas d’email client, j’envoie quand même une notif interne');
+  }
+  toList.push(COPY_TO_ADDRESS);
+
+  // 3) Envoyer l’email via ton provider
+  await sendGrid.send({
+    to:      toList,
+    subject: "Votre facture de commande",
+    html:    `<p>Bonjour,<br>Votre facture est disponible ici : <a href="${invoice_url}">Voir la facture</a></p>`
+  });
+
+  return res.json({ success: true });
+});
 
     // Envoyer l’invoice via l’API Shopify au client + CC
     await fetch(
