@@ -201,9 +201,22 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 // =========================================
 
 // Préflight CORS pour complete-draft-order
-app.options('/complete-draft-order', cors());
+app.options('/complete-draft-order', cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const ok = ALLOWED_ORIGINS.some(o =>
+      typeof o === "string" ? o === origin
+      : o instanceof RegExp  ? o.test(origin)
+                             : false
+    );
+    if (ok) return callback(null, true);
+    callback(new Error("CORS non autorisé"));
+  },
+  methods: ["POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "X-API-KEY"],
+  optionsSuccessStatus: 200
+}));
 
-// Route principale
 app.post('/complete-draft-order', cors(), async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
@@ -220,21 +233,26 @@ app.post('/complete-draft-order', cors(), async (req, res) => {
     const completeRes = await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
       {
-        method: 'POST',
+        method: 'POST', // Shopify attend un POST pour la complétion
         headers: {
           "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
           "Content-Type": "application/json"
         }
       }
     );
-    const completeData = await completeRes.json();
 
-    if (!completeRes.ok || !completeData.draft_order?.order?.id) {
-      console.error('❌ Draft completion failed:', completeData);
-      return res.status(500).json({ message: 'Failed to complete draft', raw: completeData });
+    if (!completeRes.ok) {
+      const detail = await completeRes.text().catch(() => '');
+      console.error('❌ Draft completion failed:', completeRes.status, detail);
+      return res.status(500).json({
+        message: 'Failed to complete draft',
+        status: completeRes.status,
+        detail
+      });
     }
 
-    return res.json({ success: true, order_id: completeData.draft_order.order.id });
+    // Succès (204 No Content ou autre 2xx)
+    return res.json({ success: true });
   } catch (err) {
     console.error('❌ /complete-draft-order error:', err);
     return res.status(500).json({ message: err.message });
