@@ -227,10 +227,10 @@ app.post('/complete-draft-order', async (req, res) => {
 
   try {
     const draftId = invoice_url.split('/').pop();
-    const completeRes = await fetch(
+      const completeRes = await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
       {
-        method: 'PUT',  // Shopify attend un PUT ici
+        method: 'POST',
         headers: {
           "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
           "Content-Type": "application/json"
