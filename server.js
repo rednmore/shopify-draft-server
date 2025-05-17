@@ -213,10 +213,14 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 
 // Envoi facture par email…
 app.post('/send-order-email', async (req, res) => {
-  const { invoice_url } = req.body;
-  if (!invoice_url) {
-    return res.status(400).json({ message: 'Missing invoice_url' });
+  console.log('📬 [send-order-email] req.body =', req.body);
+  const { customer_id, invoice_url } = req.body;
+  if (!customer_id || !invoice_url) {
+    console.warn('⚠️ Missing customer_id or invoice_url', { customer_id, invoice_url });
+    return res.status(400).json({ message: 'Missing customer_id or invoice_url' });
   }
+  // …
+});
 
   // Extraire l’ID de la draft_order depuis invoice_url
   // Ex : https://votreshop/.../draft_orders/123456789/invoices/abcdef…
