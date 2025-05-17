@@ -28,14 +28,28 @@ const ALLOWED_ORIGINS = [
 const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
 
 // Middlewares
+const ALLOWED_ORIGINS = [
+  "https://www.xn--zy-gka.com",
+  "https://www.zyö.com",
+  /\.myshopify\.com$/,
+  /\.cdn\.shopify\.com$/,
+  /\.shopifycloud\.com$/
+];
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      return callback(null, true);
-    }
+    if (!origin) return callback(null, true);
+    const ok = ALLOWED_ORIGINS.some(o =>
+      typeof o === "string"  ? o === origin
+    : o instanceof RegExp      ? o.test(origin)
+                               : false
+    );
+    if (ok) return callback(null, true);
+    console.warn("⛔ Origine refusée :", origin);
     callback(new Error("CORS non autorisé"));
   }
 }));
+
 app.use(bodyParser.json());
 
 // Limiteur global
