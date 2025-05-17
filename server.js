@@ -19,14 +19,6 @@ const app = express();
 // ─── Faire confiance au proxy de Render pour X-Forwarded-* ───
 app.set('trust proxy', 1);
 
-const ALLOWED_ORIGINS = [
-  "https://www.xn--zy-gka.com",
-  "https://www.zyö.com"
-];
-
-// Shopify base URL
-const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
-
 // Middlewares
 const ALLOWED_ORIGINS = [
   "https://www.xn--zy-gka.com",
@@ -35,6 +27,9 @@ const ALLOWED_ORIGINS = [
   /\.cdn\.shopify\.com$/,
   /\.shopifycloud\.com$/
 ];
+
+// Shopify base URL
+const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
 
 app.use(cors({
   origin: (origin, callback) => {
