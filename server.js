@@ -254,7 +254,7 @@ app.post('/complete-draft-order', cors(), async (req, res) => {
       });
     }
 
-    // 3) Succès (Shopify renvoie un body JSON, mais on peut s'en passer)
+    // 3) Succès
     return res.json({ success: true });
   } catch (err) {
     console.error('❌ /complete-draft-order error:', err);
