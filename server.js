@@ -235,11 +235,11 @@ app.post('/complete-draft-order', async (req, res) => {
       }
     );
     const completeData = await completeRes.json();
-    if (!completeRes.ok || !completeData.order?.id) {
+   if (!completeRes.ok || !completeData.draft_order?.order?.id) 
       console.error('❌ Draft completion failed:', completeData);
       return res.status(500).json({ message: 'Failed to complete draft', raw: completeData });
     }
-    return res.json({ success: true, order_id: completeData.order.id });
+      return res.json({ success: true, order_id: completeData.draft_order.order.id });
   } catch (err) {
     console.error('❌ /complete-draft-order error:', err);
     return res.status(500).json({ message: err.message });
