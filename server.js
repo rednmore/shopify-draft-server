@@ -148,6 +148,7 @@ app.get('/list-customers', async (req, res) => {
 //    Création de commandes provisoires
 // =========================================
 app.post('/create-draft-order', orderLimiter, async (req, res) => {
+    console.log('→ hit /complete-draft-order with body:', req.body);
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
@@ -234,6 +235,7 @@ app.post('/complete-draft-order', async (req, res) => {
 //  Envoie l’email de confirmation de commande (order) au client + copie interne
 // =========================================
 app.post('/send-order-confirmation', async (req, res) => {
+   console.log('→ hit /send-order-confirmation with body:', req.body);
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
