@@ -7,9 +7,10 @@ const fetch      = require('node-fetch');
 const rateLimit  = require('express-rate-limit');
 require('dotenv').config();
 
-// Adresse CC par défaut
+// Adresse interne en copie
 const COPY_TO_ADDRESS = process.env.COPY_TO_ADDRESS || 'info@rednmore.com';
 
+// routes and webhooks
 const syncCustomerData = require('./routes/sync-customer-data');
 require('./scripts/register-webhook');
 
@@ -23,8 +24,19 @@ const ALLOWED_ORIGINS = [
   "https://www.zyö.com"
 ];
 
-// Shopify base URL construit dynamiquement
+// Shopify base URL
 const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
+
+// Middlewares
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error("CORS non autorisé"));
+  }
+}));
+app.use(bodyParser.json());
 
 // Limiteur global
 const globalLimiter = rateLimit({
@@ -34,57 +46,44 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Trop de requêtes. Veuillez réessayer plus tard." }
 });
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn("⛔ Origine refusée :", origin);
-      callback(new Error("CORS non autorisé"));
-    }
-  }
-}));
-
-app.use(bodyParser.json());
 app.use(globalLimiter);
+
+// Route de sync (webhook)
 app.use('/sync-customer-data', syncCustomerData);
 
-// Limiteur sur la route /create-draft-order
+// Limiteur spécifique pour la création de draft orders
 const orderLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 10,
   message: { message: "Trop de créations de commande. Veuillez patienter." }
 });
 
-// GET /list-customers
+
+// 🔹 GET /list-customers
 app.get('/list-customers', async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
-  const serverKey = process.env.API_SECRET;
-  const origin    = req.get('origin');
-
-  if (!clientKey || clientKey !== serverKey) {
+  if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
   }
+  const origin = req.get('origin');
   if (origin && !ALLOWED_ORIGINS.includes(origin)) {
     return res.status(403).json({ message: "Origine non autorisée" });
   }
 
   try {
-    const r = await fetch(`${shopifyBaseUrl}/customers.json?limit=100`, {
+    const shopRes = await fetch(`${shopifyBaseUrl}/customers.json?limit=100`, {
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Content-Type": "application/json"
       }
     });
-
-    const data = await r.json();
+    const data = await shopRes.json();
     if (!data.customers) {
       return res.status(500).json({ message: "Aucun client trouvé", raw: data });
     }
 
     const clients = await Promise.all(
-      data.customers.map(async (c) => {
+      data.customers.map(async c => {
         try {
           const detailRes = await fetch(`${shopifyBaseUrl}/customers/${c.id}.json`, {
             headers: {
@@ -94,7 +93,6 @@ app.get('/list-customers', async (req, res) => {
           });
           const detail = await detailRes.json();
           const full   = detail.customer;
-
           return {
             id: full.id,
             label:
@@ -105,8 +103,7 @@ app.get('/list-customers', async (req, res) => {
                   || full.email
                   || `Client ${full.id}`
           };
-        } catch (err) {
-          console.warn(`⚠️ Erreur client ${c.id} :`, err.message);
+        } catch {
           return { id: c.id, label: `Client ${c.id}` };
         }
       })
@@ -114,20 +111,19 @@ app.get('/list-customers', async (req, res) => {
 
     res.json(clients);
   } catch (err) {
-    console.error("❌ Erreur /list-customers :", err.message);
+    console.error("❌ Erreur /list-customers :", err);
     res.status(500).json({ message: "Erreur serveur", detail: err.message });
   }
 });
 
-// POST /create-draft-order
+
+// 🔹 POST /create-draft-order
 app.post('/create-draft-order', orderLimiter, async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
-  const serverKey = process.env.API_SECRET;
-  const origin    = req.get('origin');
-
-  if (!clientKey || clientKey !== serverKey) {
+  if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
   }
+  const origin = req.get('origin');
   if (origin && !ALLOWED_ORIGINS.includes(origin)) {
     return res.status(403).json({ message: "Origine non autorisée" });
   }
@@ -138,7 +134,7 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
   }
 
   try {
-    // Création de la draft order
+    // 1) Création du draft
     const draftRes = await fetch(`${shopifyBaseUrl}/draft_orders.json`, {
       method: 'POST',
       headers: {
@@ -155,54 +151,53 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
         }
       })
     });
-
     const draft = await draftRes.json();
     if (!draft.draft_order?.id) {
-      console.error("❌ Erreur création draft :", draft);
       return res.status(500).json({ message: "Création échouée", raw: draft });
     }
 
-    const draftId    = draft.draft_order.id;
-    const invoiceUrl = draft.draft_order.invoice_url;
-
-    // Récupérer l’email du client
-    const custRes = await fetch(
-      `${shopifyBaseUrl}/customers/${customer_id}.json`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-// 1) Récupérer l’email du client
-  const custRes = await fetch(`${shopifyBaseUrl}/customers/${customer_id}.json`, {
-    headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY }
-  });
-  const custData      = await custRes.json();
-  console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
-  const customerEmail = custData.customer?.email;
-
-  // 2) Construire la liste des destinataires
-  const toList = [];
-  if (customerEmail) {
-    toList.push(customerEmail);
-  } else {
-    console.warn('⚠️ Pas d’email client, j’envoie quand même une notif interne');
+    // 2) Retourne simplement l’URL de la facture
+    res.json({ invoice_url: draft.draft_order.invoice_url });
+  } catch (err) {
+    console.error("❌ Erreur /create-draft-order :", err);
+    res.status(500).json({ message: "Erreur serveur", detail: err.message });
   }
-  toList.push(COPY_TO_ADDRESS);
-
-  // 3) Envoyer l’email via ton provider
-  await sendGrid.send({
-    to:      toList,
-    subject: "Votre facture de commande",
-    html:    `<p>Bonjour,<br>Votre facture est disponible ici : <a href="${invoice_url}">Voir la facture</a></p>`
-  });
-
-  return res.json({ success: true });
 });
 
-    // Envoyer l’invoice via l’API Shopify au client + CC
+
+// 🔹 POST /send-order-email
+app.post('/send-order-email', async (req, res) => {
+  console.log('📬 [send-order-email] req.body =', req.body);
+  const { customer_id, invoice_url, cc } = req.body;
+  if (!customer_id || !invoice_url) {
+    return res.status(400).json({ message: 'Missing customer_id or invoice_url' });
+  }
+
+  try {
+    // 1) Récupérer l’email du client
+    const respCust = await fetch(
+      `${shopifyBaseUrl}/customers/${customer_id}.json`,
+      {
+        headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY }
+      }
+    );
+    const custData = await respCust.json();
+    console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
+    const customerEmail = custData.customer?.email;
+
+    // 2) Construire la liste des destinataires
+    const toList = [];
+    if (customerEmail) {
+      toList.push(customerEmail);
+    } else {
+      console.warn('⚠️ Pas d’email client, j’envoie quand même à l’interne');
+    }
+    toList.push(COPY_TO_ADDRESS);
+
+    // 3) Extraire l’ID du draft de l’URL
+    const draftId = invoice_url.split('/').pop();
+
+    // 4) Renvoyer la facture via l’API Shopify
     await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/send_invoice.json`,
       {
@@ -213,75 +208,14 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
         },
         body: JSON.stringify({
           draft_invoice: {
-            to:             toList,
-            subject:        "Votre facture de commande",
-            custom_message: "Merci pour votre commande ! Voici votre facture."
+            to:              toList.join(','),
+            subject:         "Votre facture de commande",
+            custom_message:  "Merci pour votre commande !"
           }
         })
       }
     );
 
-    // Répondre avec l’URL de la facture
-    res.json({ invoice_url: invoiceUrl });
-
-  } catch (err) {
-    console.error("❌ Erreur /create-draft-order :", err.message);
-    res.status(500).json({ message: "Erreur serveur", detail: err.message });
-  }
-});
-
-// Envoi facture par email…
-
-app.post('/send-order-email', async (req, res) => {
-  // 1) Log de ce que tu reçois
-  console.log('📬 [send-order-email] req.body =', req.body);
-
-  // 2) Validation
-  const { customer_id, invoice_url, cc } = req.body;
-  if (!customer_id || !invoice_url) {
-    console.warn('⚠️ Missing customer_id or invoice_url', { customer_id, invoice_url });
-    return res.status(400).json({ message: 'Missing customer_id or invoice_url' });
-  }
-
-  try {
-    // 3) Récupérer l’email du client
-    const custRes = await fetch(
-      `${shopifyBaseUrl}/customers/${customer_id}.json`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-    const custData = await custRes.json();
-    console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
-    const customerEmail = custData.customer?.email;
-    if (!customerEmail) {
-      console.error('❌ Email client introuvable pour customer_id=', customer_id);
-      return res.status(400).json({ message: 'Customer email not found' });
-    }
-
-    // 4) Envoyer l’email/invoice (ici on réutilise l’API Shopify pour renvoyer la facture)
-    await fetch(
-      `${shopifyBaseUrl}/draft_orders/${invoice_url.split('/').pop()}/send_invoice.json`,
-      {
-        method: 'POST',
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          draft_invoice: {
-            to:      [customerEmail, ...(cc||[])].join(','),
-            subject: "Votre facture de commande",
-            custom_message: "Merci pour votre commande !"
-          }
-        })
-      }
-    );
-
-    // 5) Répondre OK
     res.json({ success: true });
   } catch (err) {
     console.error('❌ /send-order-email error:', err);
@@ -289,7 +223,8 @@ app.post('/send-order-email', async (req, res) => {
   }
 });
 
-// Démarrage du serveur
+
+// 🚀 Lancement du serveur
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
