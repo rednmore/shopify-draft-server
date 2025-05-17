@@ -212,8 +212,8 @@ app.options('/complete-draft-order', cors({
     if (ok) return callback(null, true);
     callback(new Error("CORS non autorisé"));
   },
-  methods: ["POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "X-API-KEY"],
+  methods: ["POST","OPTIONS"],
+  allowedHeaders: ["Content-Type","X-API-KEY"],
   optionsSuccessStatus: 200
 }));
 
@@ -230,18 +230,21 @@ app.post('/complete-draft-order', cors(), async (req, res) => {
 
   try {
     const draftId = invoice_url.split('/').pop();
+
+    // 1) Appel PUT vers Shopify pour compléter le draft
     const completeRes = await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
       {
-        method: 'POST', // Shopify attend un POST pour la complétion
+        method: 'PUT',  // PUT est l'HTTP verb attendu par Shopify
         headers: {
           "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Content-Type": "application/json"
+          "Accept": "application/json"
         }
       }
     );
 
-    if (!completeRes.ok) {
+    // 2) Vérification du statut
+    if (completeRes.status < 200 || completeRes.status >= 300) {
       const detail = await completeRes.text().catch(() => '');
       console.error('❌ Draft completion failed:', completeRes.status, detail);
       return res.status(500).json({
@@ -251,7 +254,7 @@ app.post('/complete-draft-order', cors(), async (req, res) => {
       });
     }
 
-    // Succès (204 No Content ou autre 2xx)
+    // 3) Succès (Shopify renvoie un body JSON, mais on peut s'en passer)
     return res.json({ success: true });
   } catch (err) {
     console.error('❌ /complete-draft-order error:', err);
