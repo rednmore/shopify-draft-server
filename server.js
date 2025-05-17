@@ -55,7 +55,10 @@ app.use(cors({
     if (ok) return callback(null, true);
     console.warn("⛔ Origine refusée :", origin);
     callback(new Error("CORS non autorisé"));
-  }
+  },
+  methods: ["GET","POST","PUT","OPTIONS"],        // ← autoriser PUT et OPTIONS
+  allowedHeaders: ["Content-Type","X-API-KEY"],   // ← header X-API-KEY si utilisé
+  optionsSuccessStatus: 200                       // ← pour que les prérequetes retournent OK
 }));
 
 // Parseur JSON
