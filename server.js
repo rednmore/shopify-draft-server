@@ -207,7 +207,7 @@ app.options('/complete-draft-order', cors({
     const ok = ALLOWED_ORIGINS.some(o =>
       typeof o === "string" ? o === origin
       : o instanceof RegExp    ? o.test(origin)
-                                : false
+                               : false
     );
     if (ok) return callback(null, true);
     callback(new Error("CORS non autorisé"));
@@ -238,16 +238,19 @@ app.post('/complete-draft-order', async (req, res) => {
       }
     );
     const completeData = await completeRes.json();
-   if (!completeRes.ok || !completeData.draft_order?.order?.id) 
+
+    if (!completeRes.ok || !completeData.draft_order?.order?.id) {
       console.error('❌ Draft completion failed:', completeData);
       return res.status(500).json({ message: 'Failed to complete draft', raw: completeData });
     }
-      return res.json({ success: true, order_id: completeData.draft_order.order.id });
+
+    return res.json({ success: true, order_id: completeData.draft_order.order.id });
   } catch (err) {
     console.error('❌ /complete-draft-order error:', err);
     return res.status(500).json({ message: err.message });
   }
 });
+
 // =========================================
 //  8.2. ROUTE POST : /send-order-confirmation
 //  Envoie l’email de confirmation de commande (order) au client + copie interne
@@ -400,4 +403,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
 });
-r
+
