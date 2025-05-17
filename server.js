@@ -191,7 +191,6 @@ app.post('/send-order-email', async (req, res) => {
       }
     );
     const custData = await respCust.json();
-    console.log('🔍 Shopify customer response:', JSON.stringify(custData, null, 2));
     const customerEmail = custData.customer?.email;
 
     // 2) Construire la liste des destinataires
@@ -207,16 +206,39 @@ app.post('/send-order-email', async (req, res) => {
     const draftId = invoice_url.split('/').pop();
 
     // 4) Compléter le draft pour le transformer en order confirmé
-    //    Shopify enverra alors automatiquement l’email de confirmation de commande au client
-    await fetch(
+    const completeRes = await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
       {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
           "Content-Type": "application/json"
         }
-        // pas de body nécessaire : la simple PUT complète le draft en order
+      }
+    );
+    const completeData = await completeRes.json();
+    const orderId = completeData.order?.id;
+    if (!orderId) {
+      console.error('❌ Draft completion failed:', completeData);
+      return res.status(500).json({ message: 'Failed to complete draft', raw: completeData });
+    }
+
+    // 5) Envoyer le reçu de commande au client + copie interne
+    await fetch(
+      `${shopifyBaseUrl}/orders/${orderId}/send_receipt.json`,
+      {
+        method: 'POST',
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: {
+            to:             toList.join(','),
+            subject:        "Votre confirmation de commande",
+            custom_message: "Merci pour votre commande !"
+          }
+        })
       }
     );
 
