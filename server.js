@@ -206,22 +206,17 @@ app.post('/send-order-email', async (req, res) => {
     // 3) Extraire l’ID du draft de l’URL
     const draftId = invoice_url.split('/').pop();
 
-    // 4) Renvoyer la facture via l’API Shopify
+    // 4) Compléter le draft pour le transformer en order confirmé
+    //    Shopify enverra alors automatiquement l’email de confirmation de commande au client
     await fetch(
-      `${shopifyBaseUrl}/draft_orders/${draftId}/send_invoice.json`,
+      `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
       {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          draft_invoice: {
-            to:              toList.join(','),
-            subject:         "Votre facture de commande",
-            custom_message:  "Merci pour votre commande !"
-          }
-        })
+        }
+        // pas de body nécessaire : la simple PUT complète le draft en order
       }
     );
 
