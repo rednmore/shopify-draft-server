@@ -231,6 +231,8 @@ app.post('/complete-draft-order', cors(), async (req, res) => {
   try {
     const draftId = invoice_url.split('/').pop();
 
+    console.log(`→ Completing draft ${draftId} via ${shopifyBaseUrl}/draft_orders/${draftId}/complete.json (POST)`);
+
     // 1) Appel PUT vers Shopify pour compléter le draft
     const completeRes = await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
