@@ -196,6 +196,21 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 // 8.1. ROUTE POST : /complete-draft-order
 //    Passe un draft_order en order confirmé
 // =========================================
+
+// Autoriser le preflight CORS
+app.options('/complete-draft-order', cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const ok = ALLOWED_ORIGINS.some(o =>
+      typeof o === "string" ? o === origin
+      : o instanceof RegExp    ? o.test(origin)
+                                : false
+    );
+    if (ok) return callback(null, true);
+    callback(new Error("CORS non autorisé"));
+  }
+}));
+
 app.post('/complete-draft-order', async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
@@ -234,6 +249,21 @@ app.post('/complete-draft-order', async (req, res) => {
 //  8.2. ROUTE POST : /send-order-confirmation
 //  Envoie l’email de confirmation de commande (order) au client + copie interne
 // =========================================
+
+// Autoriser le preflight CORS
+app.options('/send-order-confirmation', cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const ok = ALLOWED_ORIGINS.some(o =>
+      typeof o === "string" ? o === origin
+      : o instanceof RegExp    ? o.test(origin)
+                               : false
+    );
+    if (ok) return callback(null, true);
+    callback(new Error("CORS non autorisé"));
+  }
+}));
+
 app.post('/send-order-confirmation', async (req, res) => {
    console.log('→ hit /send-order-confirmation with body:', req.body);
   const clientKey = req.headers["x-api-key"] || req.query.key;
@@ -367,3 +397,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
 });
+r
