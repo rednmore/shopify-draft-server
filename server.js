@@ -190,6 +190,36 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
     res.status(500).json({ message: "Erreur serveur", detail: err.message });
   }
 });
+// =========================================
+// 8.1. ROUTE POST : /complete-draft-order
+//    Passe un draft_order en order confirmé
+// =========================================
+app.post('/complete-draft-order', async (req, res) => {
+  const { invoice_url } = req.body;
+  if (!invoice_url) return res.status(400).json({ message: 'Missing invoice_url' });
+  const draftId = invoice_url.split('/').pop();
+  try {
+    const completeRes = await fetch(
+      `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
+      {
+        method: 'PUT',
+        headers: {
+          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    const completeData = await completeRes.json();
+    if (!completeRes.ok || !completeData.draft_order?.order) {
+      console.error('❌ Draft completion failed:', completeData);
+      return res.status(500).json({ message: 'Failed to complete draft', raw: completeData });
+    }
+    return res.json({ success: true, order: completeData.draft_order.order });
+  } catch (err) {
+    console.error('❌ /complete-draft-order error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // =========================================
 // 9. ROUTE POST : /send-order-email
