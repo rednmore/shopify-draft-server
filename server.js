@@ -200,21 +200,11 @@ app.post('/create-draft-order', orderLimiter, async (req, res) => {
 //    Passe un draft_order en order confirmé
 // =========================================
 
-// Autoriser le preflight CORS
-app.options('/complete-draft-order', cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const ok = ALLOWED_ORIGINS.some(o =>
-      typeof o === "string" ? o === origin
-      : o instanceof RegExp    ? o.test(origin)
-                               : false
-    );
-    if (ok) return callback(null, true);
-    callback(new Error("CORS non autorisé"));
-  }
-}));
+// Préflight CORS pour complete-draft-order
+app.options('/complete-draft-order', cors());
 
-app.post('/complete-draft-order', async (req, res) => {
+// Route principale
+app.post('/complete-draft-order', cors(), async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
@@ -227,7 +217,7 @@ app.post('/complete-draft-order', async (req, res) => {
 
   try {
     const draftId = invoice_url.split('/').pop();
-      const completeRes = await fetch(
+    const completeRes = await fetch(
       `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
       {
         method: 'POST',
