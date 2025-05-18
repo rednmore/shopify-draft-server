@@ -163,12 +163,17 @@ app.options('/complete-draft-order', cors({
     if (ok) return callback(null, true);
     callback(new Error("CORS non autorisé"));
   },
-  methods: ["POST","OPTIONS"],
+  methods: ["PUT","OPTIONS"],              // autoriser PUT
   allowedHeaders: ["Content-Type","X-API-KEY"],
   optionsSuccessStatus: 200
 }));
 
-app.post('/complete-draft-order', cors(), async (req, res) => {
+app.put('/complete-draft-order', cors(), async (req, res) => {
+  console.log('🛠 /complete-draft-order called');
+  console.log(' ‣ query:', req.query);
+  console.log(' ‣ headers.x-api-key:', req.headers['x-api-key']);
+  console.log(' ‣ body:', req.body);
+
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
@@ -221,77 +226,6 @@ app.post('/complete-draft-order', cors(), async (req, res) => {
   }
 });
 
-
-// =========================================
-// 8.1. ROUTE POST : /complete-draft-order
-//    Passe un draft_order en order confirmé
-// =========================================
-
-// Préflight CORS pour complete-draft-order
-app.options('/complete-draft-order', cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const ok = ALLOWED_ORIGINS.some(o =>
-      typeof o === "string" ? o === origin
-      : o instanceof RegExp  ? o.test(origin)
-                             : false
-    );
-    if (ok) return callback(null, true);
-    callback(new Error("CORS non autorisé"));
-  },
-  methods: ["POST","OPTIONS"],
-  allowedHeaders: ["Content-Type","X-API-KEY"],
-  optionsSuccessStatus: 200
-}));
-
-app.post('/complete-draft-order', cors(), async (req, res) => {
-  const clientKey = req.headers["x-api-key"] || req.query.key;
-  if (!clientKey || clientKey !== process.env.API_SECRET) {
-    return res.status(403).json({ message: "Clé API invalide" });
-  }
-
-  const { invoice_url } = req.body;
-  if (!invoice_url) {
-    return res.status(400).json({ message: "Missing invoice_url" });
-  }
-
-  try {
-    const draftId = invoice_url.split('/').pop();
-
-    console.log(`→ Completing draft ${draftId} via ${shopifyBaseUrl}/draft_orders/${draftId}/complete.json (POST)`);
-    console.log(`🚀 [complete-draft-order] appel à Shopify: PUT ${url}`);
-
-
-    // 1) Appel PUT vers Shopify pour compléter le draft
-    const completeRes = await fetch(
-      `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`,
-      {
-        method: 'PUT',  // PUT est l'HTTP verb attendu par Shopify
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-          "Accept": "application/json"
-        }
-      }
-    );
-
-    // 2) Vérification du statut
-    if (completeRes.status < 200 || completeRes.status >= 300) {
-      const detail = await completeRes.text().catch(() => '');
-      console.error('❌ Draft completion failed:', completeRes.status, detail);
-      return res.status(500).json({
-        message: 'Failed to complete draft',
-        status: completeRes.status,
-        detail
-      });
-    }
-
-    // 3) Succès
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('❌ /complete-draft-order error:', err);
-    return res.status(500).json({ message: err.message });
-  }
-});
 
 // =========================================
 //  8.2. ROUTE POST : /send-order-confirmation
