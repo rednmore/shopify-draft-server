@@ -37,6 +37,66 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// POST /create-draft-order
+router.options(
+  '/create-draft-order',
+  cors(Object.assign({}, corsOptions, { methods: ['POST','OPTIONS'] }))
+);
+router.post(
+  '/create-draft-order',
+  orderLimiter,
+  cors(),
+  async (req, res) => {
+    const key = req.headers['x-api-key'] || req.query.key;
+    if (!key || key !== process.env.API_SECRET) {
+      return res.status(403).json({ message: 'Clé API invalide' });
+    }
+    const { customer_id, items } = req.body;
+    if (!customer_id || !Array.isArray(items)) {
+      return res.status(400).json({ message: 'Missing customer_id or items' });
+    }
+    try {
+      // Construire le draft order pour Shopify
+      const body = {
+        draft_order: {
+          line_items: items,
+          customer: { id: customer_id },
+          use_customer_default_address: true
+        }
+      };
+      const resp = await fetch(
+        shopifyBaseUrl + '/draft_orders.json',
+        {
+          method: 'POST',
+          headers: {
+            'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(body)
+        }
+      );
+      if (!resp.ok) {
+        const detail = await resp.text().catch(() => '');
+        return res.status(500).json({
+          message: 'Failed to create draft',
+          status: resp.status,
+          detail
+        });
+      }
+      const { draft_order } = await resp.json();
+      const invoice_url = draft_order?.invoice_url;
+      if (!invoice_url) {
+        return res.status(500).json({ message: 'No invoice_url returned', raw: draft_order });
+      }
+      return res.json({ invoice_url });
+    } catch (err) {
+      console.error('/create-draft-order error:', err);
+      return res.status(500).json({ message: err.message });
+    }
+  }
+);
+
 // POST /complete-draft-order
 router.options('/complete-draft-order', cors({ ...corsOptions, methods: ['POST','OPTIONS'] }));
 router.post('/complete-draft-order', orderLimiter, cors(), async (req, res) => {
