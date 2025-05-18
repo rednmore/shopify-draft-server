@@ -45,13 +45,15 @@ router.post('/update-draft-order', orderLimiter, cors(), async (req, res) => {
   if (!key || key !== process.env.API_SECRET) {
     return res.status(403).json({ message: 'Clé API invalide' });
   }
-  const { draft_id, items } = req.body;
+  const { draft_id, items, custsome_id } = req.body;
   if (!draft_id || !Array.isArray(items)) {
     return res.status(400).json({ message: 'Missing draft_id or items' });
   }
   try {
-    const resp = await fetch(
-      `${shopifyBaseUrl}/draft_orders/${draft_id}.json`,
+    const payload = { draft_order: { line_items: items } };
+    if (customer_id) payload.draft_order.customer = { id: customer_id };  
+    
+    const resp = await fetch(`${shopifyBaseUrl}/draft_orders/${draft_id}.json`,
       {
         method: 'PUT',
         headers: {
@@ -59,7 +61,7 @@ router.post('/update-draft-order', orderLimiter, cors(), async (req, res) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ draft_order: { line_items: items } })
+        body: JSON.stringify(playload)
       }
     );
     if (!resp.ok) {
