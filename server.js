@@ -96,7 +96,30 @@ const orderLimiter = rateLimit({
 // 7. ROUTE GET : /list-customers
 //     Récupère la liste des clients pour le staff
 // =========================================
-app.get('/list-customers', async function(req, res) {
+ app.options(
+   '/list-customers',
+   cors({
+     origin: (origin, callback) => {
+       if (!origin) return callback(null, true);
+       const ok = ALLOWED_ORIGINS.some(o =>
+         typeof o === 'string' ? o === origin
+         : o instanceof RegExp  ? o.test(origin)
+         : false
+       );
+       if (ok) return callback(null, true);
+       callback(new Error('CORS non autorisé'));
+     },
+     methods: ['GET','OPTIONS'],
+     allowedHeaders: ['Content-Type','X-API-KEY'],
+     optionsSuccessStatus: 200
+   })
+ );
+
+ app.get(
+   '/list-customers',
+   // on remet explicitement cors() pour forcer le header
+   cors({ origin: true }),
+   async function(req, res) {
   var clientKey = req.headers['x-api-key'] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: 'Clé API invalide' });
