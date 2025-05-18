@@ -16,7 +16,6 @@ const ALLOWED_ORIGINS = [
   /\.cdn\.shopify\.com$/,
   /\.shopifycloud\.com$/
 ];
-// plus de template literal ici
 const shopifyBaseUrl  = 'https://' + process.env.SHOPIFY_API_URL + '/admin/api/2023-10';
 const COPY_TO_ADDRESS = process.env.COPY_TO_ADDRESS || 'info@rednmore.com';
 
@@ -69,8 +68,12 @@ router.post(
       const draftId = invoice_url.split('/').pop();
       const url     = shopifyBaseUrl + '/draft_orders/' + draftId + '/complete.json';
       const resp    = await fetch(url, {
-        method: 'POST',
-        headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY }
+        method: 'PUT',
+        headers: {
+          'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
       if (!resp.ok) {
         const detail = await resp.text().catch(()=>'');
@@ -108,9 +111,7 @@ router.post(
     if (!key || key !== process.env.API_SECRET) {
       return res.status(403).json({ message: 'Clé API invalide' });
     }
-    const customer_id = req.body.customer_id;
-    const order_id    = req.body.order_id;
-    const cc          = req.body.cc;
+    const { customer_id, order_id, cc } = req.body;
     if (!customer_id || !order_id) {
       return res.status(400).json({ message: 'Missing customer_id or order_id' });
     }
@@ -123,7 +124,7 @@ router.post(
       const customerEmail = custData.customer && custData.customer.email;
       const toList = [];
       if (customerEmail) toList.push(customerEmail);
-      if (Array.isArray(cc)) toList.push.apply(toList, cc);
+      if (Array.isArray(cc)) toList.push(...cc);
       await fetch(
         shopifyBaseUrl + '/orders/' + order_id + '/send_receipt.json',
         {
@@ -156,9 +157,7 @@ router.post(
   '/send-order-email',
   cors(),
   async function(req, res) {
-    const customer_id = req.body.customer_id;
-    const invoice_url = req.body.invoice_url;
-    const cc          = req.body.cc;
+    const { customer_id, invoice_url, cc } = req.body;
     if (!customer_id || !invoice_url) {
       return res.status(400).json({ message: 'Missing customer_id or invoice_url' });
     }
@@ -171,19 +170,32 @@ router.post(
       const customerEmail = custData.customer && custData.customer.email;
       const toList = [ COPY_TO_ADDRESS ];
       if (customerEmail) toList.unshift(customerEmail);
-      if (Array.isArray(cc)) toList.push.apply(toList, cc);
+      if (Array.isArray(cc)) toList.push(...cc);
+
       const draftId = invoice_url.split('/').pop();
       const compRes = await fetch(
         shopifyBaseUrl + '/draft_orders/' + draftId + '/complete.json',
         {
-          method: 'POST',
-          headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY }
+          method: 'PUT',
+          headers: {
+            'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
         }
       );
+      if (!compRes.ok) {
+        const detail = await compRes.text().catch(()=>'');
+        return res.status(500).json({
+          message: 'Failed to complete draft',
+          status:  compRes.status,
+          detail:  detail
+        });
+      }
       const compData = await compRes.json();
       const orderId  = compData.order && compData.order.id;
       if (!orderId) {
-        return res.status(500).json({ message: 'Failed to complete draft', raw: compData });
+        return res.status(500).json({ message: 'No order ID returned', raw: compData });
       }
       await fetch(
         shopifyBaseUrl + '/orders/' + orderId + '/send_receipt.json',
@@ -191,7 +203,7 @@ router.post(
           method: 'POST',
           headers: {
             'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
-            'Content-Type':          'application/json'
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             email: {
