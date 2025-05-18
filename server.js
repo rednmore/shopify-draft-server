@@ -13,6 +13,12 @@ const fetch         = require('node-fetch');
 const rateLimit     = require('express-rate-limit');
 require('dotenv').config();
 
+console.log('→ Loaded ENV:',
+  'API_SECRET=',    process.env.API_SECRET,
+  'SHOPIFY_API_URL=', process.env.SHOPIFY_API_URL,
+  'SHOPIFY_API_KEY=', process.env.SHOPIFY_API_KEY
+);
+
 // Adresse interne pour copie des emails
 const COPY_TO_ADDRESS = process.env.COPY_TO_ADDRESS || 'info@rednmore.com';
 
