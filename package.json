@@ -1,6 +1,7 @@
 {
   "name": "shopify-draft-server",
   "version": "1.0.0",
+  "licence": "UNLICENSED",
   "description": "Serveur pour créer des draft orders Shopify",
   "main": "server.js",
   "scripts": {

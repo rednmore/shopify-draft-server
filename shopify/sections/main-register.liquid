@@ -71,28 +71,32 @@
         {{ 'customer.register.last_name' | t }}
       </label>
     </div>
-  <div class="field">
-  <input
-    type="text"
-    name="customer[note][company_name]"
-    id="RegisterForm-CompanyName"
-    placeholder="Company Name"
+
+    <!-- ✅ Nouveau champ lié à l'adresse : company -->
+    <div class="field">
+      <input
+         type="text"
+         name="customer[default_address][company]"
+         id="RegisterForm-Company"
+         placeholder="Company name"
+         autocomplete="organization"
   >
-  <label for="RegisterForm-CompanyName">
-    Company Name
-  </label>
-</div>
-<div class="field">
-  <input
-    type="text"
-    name="customer[note][vat_number]"
-    id="RegisterForm-VATNumber"
-    placeholder="VAT Number"
-  >
-  <label for="RegisterForm-VATNumber">
-    VAT Number
-  </label>
-</div>
+  <label for="RegisterForm-Company">Company</label>
+    </div>
+
+    <!-- Champ TVA conservé tel quel (optionnel) -->
+    <div class="field">
+      <input
+        type="text"
+        name="customer[note][vat_number]"
+        id="RegisterForm-VATNumber"
+        placeholder="VAT Number"
+      >
+      <label for="RegisterForm-VATNumber">
+        VAT Number
+      </label>
+    </div>
+
     <div class="field">
       <input
         type="email"

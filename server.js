@@ -1,190 +1,185 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const fetch = require('node-fetch');
-const rateLimit = require('express-rate-limit');
+// =========================================
+// server.js
+// Structuré en chapitres pour faciliter les modifications
+// =========================================
+
+// =========================================
+// 1. IMPORTS ET CONFIGURATION
+// =========================================
+const express       = require('express');
+const bodyParser    = require('body-parser');
+const cors          = require('cors');
+const fetch         = require('node-fetch');
+const rateLimit     = require('express-rate-limit');
 require('dotenv').config();
 
+console.log('→ Loaded ENV:',
+  'API_SECRET=',    process.env.API_SECRET,
+  'SHOPIFY_API_URL=', process.env.SHOPIFY_API_URL,
+  'SHOPIFY_API_KEY=', process.env.SHOPIFY_API_KEY
+);
+
+// Adresse interne pour copie des emails
+const COPY_TO_ADDRESS = process.env.COPY_TO_ADDRESS || 'info@rednmore.com';
+
+// Routes et enregistrement des webhooks
 const syncCustomerData = require('./routes/sync-customer-data');
+const draftOrderRoutes = require('./routes/draftOrderRoutes');
 require('./scripts/register-webhook');
 
+// =========================================
+// 2. INITIALISATION DE L'APPLICATION
+// =========================================
 const app = express();
+app.set('trust proxy', 1); // Faire confiance au proxy pour X-Forwarded-
+
+// =========================================
+// 3. CONSTANTES GLOBALES
+// =========================================
 const ALLOWED_ORIGINS = [
-  "https://www.xn--zy-gka.com",
-  "https://www.zyö.com"
+  'https://www.xn--zy-gka.com',
+  'https://www.zyö.com',
+  'http://localhost:3000', 
+  /\.myshopify\.com$/,
+  /\.cdn\.shopify\.com$/,
+  /\.shopifycloud\.com$/
 ];
+// évite template literal
+const shopifyBaseUrl = 'https://' + process.env.SHOPIFY_API_URL + '/admin/api/2023-10';
 
-// ✅ Shopify base URL construit dynamiquement
-const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
-
-// ✅ Limiteur global
+// =========================================
+// 4. MIDDLEWARES GLOBAUX
+// =========================================
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    var ok = ALLOWED_ORIGINS.some(function(o) {
+      return typeof o === 'string'
+        ? o === origin
+        : o instanceof RegExp
+          ? o.test(origin)
+          : false;
+    });
+    if (ok) return callback(null, true);
+    console.warn('⛔ Origine refusée :', origin);
+    callback(new Error('CORS non autorisé'));
+  },
+  methods: ['GET','POST','PUT','OPTIONS'],
+  allowedHeaders: ['Content-Type','X-API-KEY'],
+  optionsSuccessStatus: 200
+}));
+app.use(bodyParser.json());
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: "Trop de requêtes. Veuillez réessayer plus tard." }
+  message: { message: 'Trop de requêtes. Veuillez réessayer plus tard.' }
 });
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn("⛔ Origine refusée :", origin);
-      callback(new Error("CORS non autorisé"));
-    }
-  }
-}));
-
-app.use(bodyParser.json());
 app.use(globalLimiter);
+
+// =========================================
+// 5. ROUTE WEBHOOK : /sync-customer-data
+// =========================================
 app.use('/sync-customer-data', syncCustomerData);
 
-// ✅ Limiteur sur la route /create-draft-order
+// =========================================
+// 6. LIMITEUR POUR DRAFT ORDERS
+// =========================================
 const orderLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 10,
-  message: { message: "Trop de créations de commande. Veuillez patienter." }
+  message: { message: 'Trop de créations de commande. Veuillez patienter.' }
 });
 
-// 🔹 GET /list-customers
-app.get('/list-customers', async (req, res) => {
-  const clientKey = req.headers["x-api-key"] || req.query.key;
-  const serverKey = process.env.API_SECRET;
-  const origin = req.get('origin');
-
-  console.log("🔐 Clé reçue (list-customers):", clientKey);
-  console.log("🔒 Clé attendue :", serverKey);
-  console.log("🌍 Origine reçue :", origin);
-
-  if (!clientKey || clientKey !== serverKey) {
-    console.warn("⛔ Accès refusé à /list-customers (clé)");
-    return res.status(403).json({ message: "Clé API invalide" });
+// =========================================
+// 7. ROUTE GET : /list-customers
+//     Récupère la liste des clients pour le staff
+// =========================================
+app.get('/list-customers', async function(req, res) {
+  var clientKey = req.headers['x-api-key'] || req.query.key;
+  if (!clientKey || clientKey !== process.env.API_SECRET) {
+    return res.status(403).json({ message: 'Clé API invalide' });
   }
-
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-    console.warn("⛔ Origine non autorisée :", origin);
-    return res.status(403).json({ message: "Origine non autorisée" });
+  var origin = req.get('origin');
+  if (origin && !ALLOWED_ORIGINS.some(function(o) {
+      return typeof o === 'string'
+        ? o === origin
+        : o instanceof RegExp
+          ? o.test(origin)
+          : false;
+    })) {
+    return res.status(403).json({ message: 'Origine non autorisée' });
   }
-
   try {
-    const r = await fetch(`${shopifyBaseUrl}/customers.json?limit=100`, {
-      headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-        "Content-Type": "application/json"
+    var shopRes = await fetch(
+      shopifyBaseUrl + '/customers.json?limit=100',
+      {
+        headers: {
+          'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+          'Content-Type': 'application/json'
+        }
       }
-    });
-
-    const data = await r.json();
-    console.log("👁️ Extrait client brut :", data.customers?.[0]);
-
+    );
+    var data = await shopRes.json();
     if (!data.customers) {
-      return res.status(500).json({ message: "Aucun client trouvé", raw: data });
+      return res.status(500).json({ message: 'Aucun client trouvé', raw: data });
     }
-
-    const clients = await Promise.all(
-      data.customers.map(async (c) => {
+    var clients = await Promise.all(
+      data.customers.map(async function(c) {
         try {
-          const detailRes = await fetch(`${shopifyBaseUrl}/customers/${c.id}.json`, {
-            headers: {
-              "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-              "Content-Type": "application/json"
+          var detailRes = await fetch(
+            shopifyBaseUrl + '/customers/' + c.id + '.json',
+            {
+              headers: {
+                'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+                'Content-Type': 'application/json'
+              }
             }
-          });
-
-          const detail = await detailRes.json();
-          const full = detail.customer;
-
-          return {
-            id: full.id,
-            label:
-              (full.first_name || full.last_name)
-                ? `${full.first_name || ''} ${full.last_name || ''}`.trim()
-                : full.default_address?.company || full.addresses?.[0]?.company || full.email || `Client ${full.id}`
-          };
-        } catch (err) {
-          console.warn(`⚠️ Erreur client ${c.id} :`, err.message);
-          return { id: c.id, label: `Client ${c.id}` };
+          );
+          var full = (await detailRes.json()).customer;
+          var label;
+          if (full.first_name || full.last_name) {
+            label = ((full.first_name || '') + ' ' + (full.last_name || '')).trim();
+          } else if (full.default_address && full.default_address.company) {
+            label = full.default_address.company;
+          } else if (full.addresses && full.addresses[0] && full.addresses[0].company) {
+            label = full.addresses[0].company;
+          } else if (full.email) {
+            label = full.email;
+          } else {
+            label = 'Client ' + full.id;
+          }
+          return { id: full.id, label: label };
+        } catch (_) {
+          return { id: c.id, label: 'Client ' + c.id };
         }
       })
     );
-
     res.json(clients);
-    console.log("📤 Clients envoyés :", clients);
   } catch (err) {
-    console.error("❌ Erreur /list-customers :", err.message);
-    res.status(500).json({ message: "Erreur serveur", detail: err.message });
+       console.error("❌ Erreur /list-customers :", err.stack || err);
+      res.status(500).json({ message: "Erreur serveur", detail: err.message, stack: err.stack });  
   }
 });
 
-// 🔹 POST /create-draft-order
-app.post('/create-draft-order', orderLimiter, async (req, res) => {
-  const clientKey = req.headers["x-api-key"] || req.query.key;
-  const serverKey = process.env.API_SECRET;
-  const origin = req.get('origin');
+// =========================================
+// 8.1. MONTAGE DES ROUTES DRAFT ORDERS
+//      (complete-draft-order & send-order-confirmation & send-order-email)
+// =========================================
+app.use('/', draftOrderRoutes);
 
-  console.log("🔐 Clé reçue (create-draft-order):", clientKey);
-  console.log("🔒 Clé attendue :", serverKey);
-  console.log("🌍 Origine reçue :", origin);
+// =========================================
+// 9. (routes déplacées dans draftOrderRoutes.js)
+//      - POST /complete-draft-order
+//      - POST /send-order-confirmation
+//      - POST /send-order-email
+// =========================================
 
-  if (!clientKey || clientKey !== serverKey) {
-    return res.status(403).json({ message: "Clé API invalide" });
-  }
-
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-    return res.status(403).json({ message: "Origine non autorisée" });
-  }
-
-  const { customer_id, items } = req.body;
-  if (!customer_id || !items) {
-    return res.status(400).json({ message: "Données manquantes" });
-  }
-
-  try {
-    const draftRes = await fetch(`${shopifyBaseUrl}/draft_orders.json`, {
-      method: 'POST',
-      headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        draft_order: {
-          line_items: items,
-          customer: { id: customer_id },
-          use_customer_default_address: true,
-          tags: "INTERNAL",
-          note: "Commande créée depuis le Storefront interne"
-        }
-      })
-    });
-
-    const draft = await draftRes.json();
-    if (!draft.draft_order || !draft.draft_order.id) {
-      console.error("❌ Erreur création draft :", draft);
-      return res.status(500).json({ message: "Création échouée", raw: draft });
-    }
-
-    const id = draft.draft_order.id;
-
-    await fetch(`${shopifyBaseUrl}/draft_orders/${id}/send_invoice.json`, {
-      method: 'POST',
-      headers: {
-        "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ draft_order_invoice: {} })
-    });
-
-    res.json({ invoice_url: draft.draft_order.invoice_url });
-  } catch (err) {
-    console.error("❌ Erreur /create-draft-order :", err.message);
-    res.status(500).json({ message: "Erreur serveur", detail: err.message });
-  }
-});
-
-// 🚀 Lancement du serveur
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Serveur actif sur le port ${PORT}`);
+// =========================================
+// 10. LANCEMENT DU SERVEUR
+// =========================================
+var PORT = process.env.PORT || 3000;
+app.listen(PORT, function() {
+  console.log('✅ Serveur actif sur le port ' + PORT);
 });
