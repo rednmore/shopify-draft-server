@@ -152,8 +152,8 @@ app.get('/list-customers', async function(req, res) {
     );
     res.json(clients);
   } catch (err) {
-    console.error('❌ Erreur /list-customers :', err);
-    res.status(500).json({ message: 'Erreur serveur', detail: err.message });
+       console.error("❌ Erreur /list-customers :", err.stack || err);
+      res.status(500).json({ message: "Erreur serveur", detail: err.message, stack: err.stack });  
   }
 });
 
