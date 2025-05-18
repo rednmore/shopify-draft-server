@@ -33,6 +33,7 @@ app.set('trust proxy', 1); // Faire confiance au proxy pour X-Forwarded-
 const ALLOWED_ORIGINS = [
   'https://www.xn--zy-gka.com',
   'https://www.zyö.com',
+  'http://localhost:3000', 
   /\.myshopify\.com$/,
   /\.cdn\.shopify\.com$/,
   /\.shopifycloud\.com$/
