@@ -56,9 +56,9 @@ app.use(cors({
     console.warn("⛔ Origine refusée :", origin);
     callback(new Error("CORS non autorisé"));
   },
-  methods: ["GET","POST","PUT","OPTIONS"],        // ← autoriser PUT et OPTIONS
-  allowedHeaders: ["Content-Type","X-API-KEY"],   // ← header X-API-KEY si utilisé
-  optionsSuccessStatus: 200                       // ← pour que les prérequetes retournent OK
+  methods: ["GET","POST","PUT","OPTIONS"],
+  allowedHeaders: ["Content-Type","X-API-KEY"],
+  optionsSuccessStatus: 200
 }));
 
 // Parseur JSON
@@ -98,7 +98,11 @@ app.get('/list-customers', async (req, res) => {
     return res.status(403).json({ message: "Clé API invalide" });
   }
   const origin = req.get('origin');
-  if (origin && !ALLOWED_ORIGINS.some(o => typeof o === 'string' ? o === origin : o instanceof RegExp && o.test(origin))) {
+  if (origin && !ALLOWED_ORIGINS.some(o =>
+      typeof o === 'string' ? o === origin
+      : o instanceof RegExp  ? o.test(origin)
+      : false
+    )) {
     return res.status(403).json({ message: "Origine non autorisée" });
   }
 
@@ -158,17 +162,17 @@ app.options('/complete-draft-order', cors({
     const ok = ALLOWED_ORIGINS.some(o =>
       typeof o === "string" ? o === origin
       : o instanceof RegExp  ? o.test(origin)
-                             : false
+      : false
     );
     if (ok) return callback(null, true);
     callback(new Error("CORS non autorisé"));
   },
-  methods: ["PUT","OPTIONS"],              // autoriser PUT
+  methods: ["POST","OPTIONS"],
   allowedHeaders: ["Content-Type","X-API-KEY"],
   optionsSuccessStatus: 200
 }));
 
-app.put('/complete-draft-order', cors(), async (req, res) => {
+app.post('/complete-draft-order', cors(), async (req, res) => {
   console.log('🛠 /complete-draft-order called');
   console.log(' ‣ query:', req.query);
   console.log(' ‣ headers.x-api-key:', req.headers['x-api-key']);
@@ -188,11 +192,11 @@ app.put('/complete-draft-order', cors(), async (req, res) => {
     const draftId  = invoice_url.split('/').pop();
     const draftUrl = `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`;
 
-    console.log(`→ Completing draft ${draftId} via ${draftUrl} (PUT)`);
+    console.log(`→ Completing draft ${draftId} via ${draftUrl} (POST)`);
 
-    // 1) Appel PUT vers Shopify pour compléter le draft
+    // 1) Appel POST vers Shopify pour compléter le draft
     const completeRes = await fetch(draftUrl, {
-      method: 'PUT',
+      method: 'POST',
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
         "Accept": "application/json"
@@ -226,28 +230,30 @@ app.put('/complete-draft-order', cors(), async (req, res) => {
   }
 });
 
-
 // =========================================
-//  8.2. ROUTE POST : /send-order-confirmation
-//  Envoie l’email de confirmation de commande (order) au client + copie interne
+// 8.2. ROUTE POST : /send-order-confirmation
+//    Envoie l’email de confirmation de commande (order) au client + copie interne
 // =========================================
 
-// Autoriser le preflight CORS
+// Préflight CORS pour send-order-confirmation
 app.options('/send-order-confirmation', cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     const ok = ALLOWED_ORIGINS.some(o =>
       typeof o === "string" ? o === origin
-      : o instanceof RegExp    ? o.test(origin)
-                               : false
+      : o instanceof RegExp  ? o.test(origin)
+      : false
     );
     if (ok) return callback(null, true);
     callback(new Error("CORS non autorisé"));
-  }
+  },
+  methods: ["POST","OPTIONS"],
+  allowedHeaders: ["Content-Type","X-API-KEY"],
+  optionsSuccessStatus: 200
 }));
 
-app.post('/send-order-confirmation', async (req, res) => {
-   console.log('→ hit /send-order-confirmation with body:', req.body);
+app.post('/send-order-confirmation', cors(), async (req, res) => {
+  console.log('→ hit /send-order-confirmation with body:', req.body);
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
@@ -259,7 +265,7 @@ app.post('/send-order-confirmation', async (req, res) => {
   }
 
   try {
-   // 1) Récupérer l’email du client
+    // 1) Récupérer l’email du client
     const respCust = await fetch(
       `${shopifyBaseUrl}/customers/${customer_id}.json`,
       { headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY } }
@@ -284,15 +290,15 @@ app.post('/send-order-confirmation', async (req, res) => {
         },
         body: JSON.stringify({
           email: {
-            to:              toList.join(','),
-            subject:         "Votre confirmation de commande",
-            custom_message:  "Merci pour votre commande !"
+            to:             toList.join(','),
+            subject:        "Votre confirmation de commande",
+            custom_message: "Merci pour votre commande !"
           }
         })
-     }
-   );
+      }
+    );
 
-  return res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     console.error("❌ /send-order-confirmation error:", err);
     return res.status(500).json({ message: err.message });
@@ -303,7 +309,7 @@ app.post('/send-order-confirmation', async (req, res) => {
 // 9. ROUTE POST : /send-order-email
 //    Envoi du reçu de commande après completion de draft
 // =========================================
-app.post('/send-order-email', async (req, res) => {
+app.post('/send-order-email', cors(), async (req, res) => {
   console.log('📬 [send-order-email] req.body =', req.body);
   const { customer_id, invoice_url, cc } = req.body;
   if (!customer_id || !invoice_url) {
@@ -324,6 +330,7 @@ app.post('/send-order-email', async (req, res) => {
     if (customerEmail) toList.push(customerEmail);
     else console.warn('⚠️ Pas d’email client, j’envoie quand même à l’interne');
     toList.push(COPY_TO_ADDRESS);
+    if (Array.isArray(cc)) toList.push(...cc);
 
     // Extraire l’ID du draft
     const draftId = invoice_url.split('/').pop();
@@ -357,18 +364,18 @@ app.post('/send-order-email', async (req, res) => {
         },
         body: JSON.stringify({
           email: {
-            to: toList.join(','),
-            subject: "Votre confirmation de commande",
-            custom_message: "Merci pour votre commande !"
+            to:               toList.join(','),
+            subject:          "Votre confirmation de commande",
+            custom_message:   "Merci pour votre commande !"
           }
         })
       }
     );
 
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
     console.error('❌ /send-order-email error:', err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
@@ -379,4 +386,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
 });
-
