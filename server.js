@@ -38,7 +38,7 @@ const ALLOWED_ORIGINS = [
   /\.cdn\.shopify\.com$/,
   /\.shopifycloud\.com$/
 ];
-const shopifyBaseUrl = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
+const shopifyBaseUrl = 'https://' + process.env.SHOPIFY_API_URL + '/admin/api/2023-10';
 
 // =========================================
 // 4. MIDDLEWARES GLOBAUX
