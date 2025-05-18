@@ -1,5 +1,3 @@
-// routes/draftOrderRoutes.js
-
 const express   = require('express');
 const cors      = require('cors');
 const fetch     = require('node-fetch');
@@ -39,6 +37,44 @@ const corsOptions = {
 };
 
 // ===========================
+// POST /update-draft-order
+// ===========================
+router.options('/update-draft-order', cors({ ...corsOptions, methods: ['POST','OPTIONS'] }));
+router.post('/update-draft-order', orderLimiter, cors(), async (req, res) => {
+  const key = req.headers['x-api-key'] || req.query.key;
+  if (!key || key !== process.env.API_SECRET) {
+    return res.status(403).json({ message: 'Clé API invalide' });
+  }
+  const { draft_id, items } = req.body;
+  if (!draft_id || !Array.isArray(items)) {
+    return res.status(400).json({ message: 'Missing draft_id or items' });
+  }
+  try {
+    const resp = await fetch(
+      `${shopifyBaseUrl}/draft_orders/${draft_id}.json`,
+      {
+        method: 'PUT',
+        headers: {
+          'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ draft_order: { line_items: items } })
+      }
+    );
+    if (!resp.ok) {
+      const detail = await resp.text().catch(()=>'');
+      return res.status(500).json({ message: 'Failed to update draft', status: resp.status, detail });
+    }
+    const { draft_order } = await resp.json();
+    return res.json({ success: true, invoice_url: draft_order.invoice_url });
+  } catch (err) {
+    console.error('/update-draft-order error:', err);
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// ===========================
 // POST /create-draft-order
 // ===========================
 router.options('/create-draft-order', cors({ ...corsOptions, methods: ['POST','OPTIONS'] }));
@@ -53,7 +89,7 @@ router.post('/create-draft-order', orderLimiter, cors(), async (req, res) => {
   }
   try {
     const body = { draft_order: { line_items: items, customer: { id: customer_id }, use_customer_default_address: true } };
-    const resp = await fetch(shopifyBaseUrl + '/draft_orders.json', {
+    const resp = await fetch(`${shopifyBaseUrl}/draft_orders.json`, {
       method: 'POST',
       headers: {
         'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
@@ -67,7 +103,6 @@ router.post('/create-draft-order', orderLimiter, cors(), async (req, res) => {
       return res.status(500).json({ message: 'Failed to create draft', status: resp.status, detail });
     }
     const { draft_order } = await resp.json();
-    // retourne l'ID du draft ainsi que l'URL de facture
     return res.json({ draft_id: draft_order.id, invoice_url: draft_order.invoice_url });
   } catch (err) {
     console.error('/create-draft-order error:', err);
@@ -89,7 +124,7 @@ router.post('/complete-draft-order', orderLimiter, cors(), async (req, res) => {
     return res.status(400).json({ message: 'Missing invoice_url or draft_id' });
   }
   try {
-    const url = shopifyBaseUrl + '/draft_orders/' + draft_id + '/complete.json';
+    const url = `${shopifyBaseUrl}/draft_orders/${draft_id}/complete.json`;
     const resp = await fetch(url, {
       method: 'PUT',
       headers: {
@@ -128,20 +163,27 @@ router.post('/send-order-confirmation', cors(), async (req, res) => {
     return res.status(400).json({ message: 'Missing customer_id or order_id' });
   }
   try {
-    const custRes = await fetch(shopifyBaseUrl + '/customers/' + customer_id + '.json',
-      { headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY } });
+    const custRes = await fetch(`${shopifyBaseUrl}/customers/${customer_id}.json`, {
+      headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY }
+    });
     const custData = await custRes.json();
     const customerEmail = custData.customer?.email;
     const toList = [];
     if (customerEmail) toList.push(customerEmail);
     if (Array.isArray(cc)) toList.push(...cc);
-    await fetch(shopifyBaseUrl + '/orders/' + order_id + '/send_receipt.json', {
+    await fetch(`${shopifyBaseUrl}/orders/${order_id}/send_receipt.json`, {
       method: 'POST',
       headers: {
         'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email: { to: toList.join(','), subject: 'Votre confirmation de commande', custom_message: 'Merci pour votre commande !' } })
+      body: JSON.stringify({
+        email: {
+          to: toList.join(','),
+          subject: 'Votre confirmation de commande',
+          custom_message: 'Merci pour votre commande !'
+        }
+      })
     });
     return res.json({ success: true });
   } catch (err) {
@@ -160,7 +202,7 @@ router.post('/send-order-email', cors(), async (req, res) => {
   }
   try {
     // compléter le draft
-    const compRes = await fetch(shopifyBaseUrl + '/draft_orders/' + draft_id + '/complete.json', {
+    const compRes = await fetch(`${shopifyBaseUrl}/draft_orders/${draft_id}/complete.json`, {
       method: 'PUT',
       headers: {
         'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
@@ -177,9 +219,11 @@ router.post('/send-order-email', cors(), async (req, res) => {
     if (!order_id) {
       return res.status(500).json({ message: 'No order ID returned', raw: draft_order });
     }
+
     // envoyer le reçu
-    const custRes = await fetch(shopifyBaseUrl + '/customers/' + customer_id + '.json',
-      { headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY } });
+    const custRes = await fetch(`${shopifyBaseUrl}/customers/${customer_id}.json`, {
+      headers: { 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY }
+    });
     const custData = await custRes.json();
     const customerEmail = custData.customer?.email;
 
@@ -187,13 +231,19 @@ router.post('/send-order-email', cors(), async (req, res) => {
     if (customerEmail) toList.unshift(customerEmail);
     if (Array.isArray(cc)) toList.push(...cc);
 
-    await fetch(shopifyBaseUrl + '/orders/' + order_id + '/send_receipt.json', {
+    await fetch(`${shopifyBaseUrl}/orders/${order_id}/send_receipt.json`, {
       method: 'POST',
       headers: {
         'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email: { to: toList.join(','), subject: 'Votre confirmation de commande', custom_message: 'Merci pour votre commande !' } })
+      body: JSON.stringify({
+        email: {
+          to: toList.join(','),
+          subject: 'Votre confirmation de commande',
+          custom_message: 'Merci pour votre commande !'
+        }
+      })
     });
 
     return res.json({ success: true });
