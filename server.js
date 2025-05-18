@@ -147,53 +147,80 @@ app.get('/list-customers', async (req, res) => {
 });
 
 // =========================================
-// 8. ROUTE POST : /create-draft-order
-//    Création de commandes provisoires
+// 8.1. ROUTE POST : /complete-draft-order
+//    Passe un draft_order en order confirmé
 // =========================================
-app.post('/create-draft-order', orderLimiter, async (req, res) => {
-    console.log('→ hit /complete-draft-order with body:', req.body);
+
+// Préflight CORS pour complete-draft-order
+app.options('/complete-draft-order', cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const ok = ALLOWED_ORIGINS.some(o =>
+      typeof o === "string" ? o === origin
+      : o instanceof RegExp  ? o.test(origin)
+                             : false
+    );
+    if (ok) return callback(null, true);
+    callback(new Error("CORS non autorisé"));
+  },
+  methods: ["POST","OPTIONS"],
+  allowedHeaders: ["Content-Type","X-API-KEY"],
+  optionsSuccessStatus: 200
+}));
+
+app.post('/complete-draft-order', cors(), async (req, res) => {
   const clientKey = req.headers["x-api-key"] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: "Clé API invalide" });
   }
-  const origin = req.get('origin');
-  if (origin && !ALLOWED_ORIGINS.some(o => typeof o === 'string' ? o === origin : o instanceof RegExp && o.test(origin))) {
-    return res.status(403).json({ message: "Origine non autorisée" });
-  }
 
-  const { customer_id, items } = req.body;
-  if (!customer_id || !items) {
-    return res.status(400).json({ message: "Données manquantes" });
+  const { invoice_url } = req.body;
+  if (!invoice_url) {
+    return res.status(400).json({ message: "Missing invoice_url" });
   }
 
   try {
-    const draftRes = await fetch(`${shopifyBaseUrl}/draft_orders.json`, {
-      method: 'POST',
+    const draftId  = invoice_url.split('/').pop();
+    const draftUrl = `${shopifyBaseUrl}/draft_orders/${draftId}/complete.json`;
+
+    console.log(`→ Completing draft ${draftId} via ${draftUrl} (PUT)`);
+
+    // 1) Appel PUT vers Shopify pour compléter le draft
+    const completeRes = await fetch(draftUrl, {
+      method: 'PUT',
       headers: {
         "X-Shopify-Access-Token": process.env.SHOPIFY_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        draft_order: {
-          line_items: items,
-          customer: { id: customer_id },
-          use_customer_default_address: true,
-          tags: "INTERNAL",
-          note: "Commande créée depuis le Storefront interne"
-        }
-      })
+        "Accept": "application/json"
+      }
     });
-    const draft = await draftRes.json();
-    if (!draft.draft_order?.id) {
-      return res.status(500).json({ message: "Création échouée", raw: draft });
+
+    // 2) Vérification du statut
+    if (!completeRes.ok) {
+      const detail = await completeRes.text().catch(() => '');
+      console.error('❌ Draft completion failed:', completeRes.status, detail);
+      return res.status(500).json({
+        message: 'Failed to complete draft',
+        status: completeRes.status,
+        detail
+      });
     }
 
-    res.json({ invoice_url: draft.draft_order.invoice_url });
+    // 3) Lecture de l’order retourné
+    const { draft_order } = await completeRes.json();
+    const order = draft_order?.order;
+    if (!order?.id) {
+      console.error('❌ Draft completed but no order id:', draft_order);
+      return res.status(500).json({ message: 'No order ID returned', raw: draft_order });
+    }
+
+    // 4) Succès
+    return res.json({ success: true, order_id: order.id });
   } catch (err) {
-    console.error("❌ Erreur /create-draft-order :", err);
-    res.status(500).json({ message: "Erreur serveur", detail: err.message });
+    console.error('❌ /complete-draft-order error:', err);
+    return res.status(500).json({ message: err.message });
   }
 });
+
 
 // =========================================
 // 8.1. ROUTE POST : /complete-draft-order
