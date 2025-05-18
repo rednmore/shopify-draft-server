@@ -1,10 +1,23 @@
-{{ 'staff-draft-order.css'      | asset_url | stylesheet_tag }}
+{%- comment -%}
+<locksmith>
+{% endcomment -%}
+
 {{ 'tom-select.css'             | asset_url | stylesheet_tag }}
 {{ 'tom-select.complete.min.js' | asset_url | script_tag }}
+{{ 'staff-draft-order.css'      | asset_url | stylesheet_tag }}
 {{ 'staff-draft-order.js'       | asset_url | script_tag }}
 
 <div class="staff-draft-order-section"
-  data-placeholder="{{ section.settings.placeholder_text }}">
+     data-section-id="{{ section.id }}"
+     data-placeholder="{{ section.settings.placeholder_text }}"
+     data-please-select-customer-text="{{ section.settings.please_select_customer_text }}"
+     data-creating-text="{{ section.settings.creating_text }}"
+     data-order-created-text="{{ section.settings.order_created_text }}"
+     data-post-order-link-text="{{ section.settings.post_order_link_text }}"
+     data-validate-send-text="{{ section.settings.validate_send_text }}"
+     data-sending-text="{{ section.settings.sending_text }}"
+     data-send-error-text="{{ section.settings.send_error_text }}"
+     data-sent-text="{{ section.settings.sent_text }}">
   <div class="staff-draft-order-container">
     <div class="staff-draft-order-wrapper">
 
@@ -61,30 +74,35 @@
   "name": "Staff Order",
   "tag": "section",
   "settings": [
-    { "type": "text",   "id": "page_title",             "label": "Page title",               "default": "Create an order for a specific customer" },
-    { "type": "text",   "id": "select_label",           "label": "Client selector label",    "default": "Select a client:" },
-    { "type": "color",  "id": "feedback_color",         "label": "Feedback message color",   "default": "#000000" },
-    { "type": "checkbox","id": "show_help_text",         "label": "Show help text",           "default": true },
-    { "type": "richtext","id": "help_text",             "label": "Help text",               "default": "<p>Use this interface to create an order for an existing customer.</p>" },
-    { "type": "text",   "id": "button_label",           "label": "Button text",              "default": "Create order" },
-    { "type": "color",  "id": "button_bg",              "label": "Button background color",  "default": "#e6e6e6" },
-    { "type": "color",  "id": "button_text",            "label": "Button text color",       "default": "#000000" },
-    { "type": "color",  "id": "button_border",          "label": "Button border color",     "default": "#000000" },
-    { "type": "range",  "id": "button_radius",          "label": "Button border radius",    "min": 0, "max": 20, "step": 1, "default": 6 },
-    { "type": "text",   "id": "button_padding",         "label": "Button padding",          "default": "10px 20px" },
-    { "type": "range",  "id": "button_font_size",       "label": "Font size (px)",          "min": 12, "max": 30, "step": 1, "default": 16 },
-    { "type": "text",   "id": "placeholder_text",       "label": "Placeholder text",        "default": "Search for opticians…"}, 
+    { "type": "text",    "id": "page_title",                  "label": "Page title",                             "default": "Create an order for a specific customer" },
+    { "type": "text",    "id": "select_label",                "label": "Client selector label",                  "default": "Select a client:" },
+    { "type": "color",   "id": "feedback_color",              "label": "Feedback message color",                 "default": "#000000" },
+    { "type": "checkbox","id": "show_help_text",              "label": "Show help text",                         "default": true },
+    { "type": "richtext","id": "help_text",                   "label": "Help text",                              "default": "<p>Use this interface to create an order for an existing customer.</p>" },
+    { "type": "text",    "id": "button_label",                "label": "Button text",                            "default": "Create order" },
+    { "type": "color",   "id": "button_bg",                   "label": "Button background color",                "default": "#e6e6e6" },
+    { "type": "color",   "id": "button_text",                 "label": "Button text color",                      "default": "#000000" },
+    { "type": "color",   "id": "button_border",               "label": "Button border color",                    "default": "#000000" },
+    { "type": "range",   "id": "button_radius",               "label": "Button border radius (px)",              "min": 0, "max": 20, "step": 1, "default": 6 },
+    { "type": "text",    "id": "button_padding",              "label": "Button padding",                         "default": "10px 20px" },
+    { "type": "range",   "id": "button_font_size",            "label": "Font size (px)",                         "min": 12, "max": 30, "step": 1, "default": 16 },
+    { "type": "text",    "id": "placeholder_text",            "label": "Placeholder text",                       "default": "Search for opticians…" },
+    { "type": "text",    "id": "order_created_text",          "label": "Order created text",                     "default": "Order created" },
+    { "type": "text",    "id": "post_order_link_text",        "label": "Post-order link text",                   "default": "Send order to optician" },
+    { "type": "text",    "id": "please_select_customer_text", "label": "Error text: please select customer",      "default": "Please select a customer" },
     {
-      "type": "select","id": "button_font_weight",       "label": "Font weight",
+      "type": "select",
+      "id":   "button_font_weight",
+      "label":"Font weight",
       "options": [
-        { "value": "normal", "label": "Normal" },
-        { "value": "bold",   "label": "Bold" },
-        { "value": "lighter","label": "Light" }
+        { "value": "normal",  "label": "Normal" },
+        { "value": "bold",    "label": "Bold" },
+        { "value": "lighter", "label": "Light" }
       ],
       "default": "normal"
     },
-    { "type": "text",   "id": "button_width",           "label": "Button width",            "default": "100%" },
-    { "type": "text",   "id": "button_height",          "label": "Button height",           "default": "44px" }
+    { "type": "text",    "id": "button_width",                "label": "Button width",                          "default": "100%" },
+    { "type": "text",    "id": "button_height",               "label": "Button height",                         "default": "44px" }
   ],
   "presets": [
     { "name": "Staff order", "category": "Custom" }
