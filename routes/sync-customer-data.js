@@ -3,7 +3,9 @@ const axios = require('axios');
 const router = express.Router();
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
-const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
+const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_API_URL; // ex: your-shop.myshopify.com
+const API_VERSION = '2023-10';
+const baseUrl = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${API_VERSION}`;
 
 router.post('/', async (req, res) => {
   if (!req.body || Object.keys(req.body).length === 0) {
@@ -18,7 +20,7 @@ router.post('/', async (req, res) => {
 
   try {
     const { data: { customer } } = await axios.get(
-      `${SHOPIFY_API_URL}/customers/${customerId}.json`,
+      `${baseUrl}/customers/${customerId}.json`,
       {
         headers: {
           'X-Shopify-Access-Token': SHOPIFY_API_KEY,
@@ -60,13 +62,12 @@ router.post('/', async (req, res) => {
       zip: zip || '0000',
       city: city || 'Ville à compléter',
       default: true
-      // ❌ Pas de champ "country"
     };
 
     if (!customer.default_address) {
       console.log('➕ Aucune adresse existante → création');
       await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`,
+        `${baseUrl}/customers/${customerId}/addresses.json`,
         { address: addressPayload },
         {
           headers: {
@@ -78,7 +79,7 @@ router.post('/', async (req, res) => {
     } else {
       console.log('✏️ Adresse existante → mise à jour');
       await axios.put(
-        `${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
+        `${baseUrl}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
         { address: addressPayload },
         {
           headers: {
@@ -92,7 +93,7 @@ router.post('/', async (req, res) => {
     if (vat) {
       console.log('➕ Enregistrement TVA en tant que metafield');
       await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`,
+        `${baseUrl}/customers/${customerId}/metafields.json`,
         {
           metafield: {
             namespace: 'custom',
