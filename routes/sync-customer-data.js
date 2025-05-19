@@ -5,8 +5,9 @@ const router = express.Router();
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 
+// ✅ Route POST pour webhook customers/create
 router.post('/', async (req, res) => {
-  // ✅ Shopify ping test (empty body)
+  // Shopify ping test (body vide)
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(200).json({ message: 'Webhook OK' });
   }
@@ -28,12 +29,14 @@ router.post('/', async (req, res) => {
       }
     );
 
-    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
 
-    const note = customer.note ? JSON.parse(customer.note) : {};
-    const company = note.company || note.company_name;
-    const vat = note.vat_number;
+    // ✅ Récupération directe du champ "company" transmis à l'inscription
+    const company = req.body.company;
 
+    // ✅ Création automatique d'une adresse par défaut avec le company (si non existante)
     if (!customer.default_address && company) {
       await axios.post(
         `${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`,
@@ -53,17 +56,14 @@ router.post('/', async (req, res) => {
           }
         }
       );
-    }
-
-    if (vat) {
-      await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`,
+    } 
+    // ✅ Si l'adresse par défaut existe, simplement la mettre à jour avec "company"
+    else if (customer.default_address && company) {
+      await axios.put(
+        `${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
         {
-          metafield: {
-            namespace: 'custom',
-            key: 'vat_number',
-            value: vat,
-            type: 'single_line_text_field'
+          address: {
+            company: company
           }
         },
         {
