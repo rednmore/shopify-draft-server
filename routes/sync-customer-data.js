@@ -6,7 +6,6 @@ const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 
 router.post('/', async (req, res) => {
-  // Webhook ping test (Shopify envoie un appel vide pour test)
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(200).json({ message: 'Webhook OK' });
   }
@@ -18,7 +17,6 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // Récupérer les infos complètes du client
     const { data: { customer } } = await axios.get(
       `${SHOPIFY_API_URL}/customers/${customerId}.json`,
       {
@@ -33,7 +31,6 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
-    // Extraire les données de customer.note
     let noteData = {};
     try {
       if (customer.note) {
@@ -47,49 +44,53 @@ router.post('/', async (req, res) => {
     const address1 = noteData.address1?.trim();
     const zip = noteData.zip?.trim();
     const city = noteData.city?.trim();
-    const country = noteData.country?.trim() || 'CH';
     const vat = noteData.vat_number?.trim();
 
-    // Vérifier que l'entreprise est bien renseignée
+    console.log(`🔁 Traitement client : ${customer.email} (${customerId})`);
+    console.log(`→ Société : ${company}, Adresse : ${address1}, ${zip} ${city}, TVA : ${vat}`);
+
     if (!company) {
-      console.warn(`⚠️ Le client ${customer.email} n’a pas de société renseignée`);
+      console.warn(`⚠️ Le client ${customer.email} n’a pas de société renseignée.`);
       return res.status(400).json({ error: 'Company is required' });
     }
 
-    // Construire l’adresse à créer ou mettre à jour
     const addressPayload = {
       company,
       address1: address1 || 'Adresse à compléter',
       zip: zip || '0000',
       city: city || 'Ville à compléter',
-      country,
       default: true
+      // ❌ Pas de champ "country"
     };
 
     if (!customer.default_address) {
-      // Créer une adresse si aucune n'existe
+      console.log('➕ Aucune adresse existante → création');
       await axios.post(
         `${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`,
         { address: addressPayload },
-        { headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-          'Content-Type': 'application/json'
-        }}
+        {
+          headers: {
+            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+            'Content-Type': 'application/json'
+          }
+        }
       );
     } else {
-      // Sinon, mettre à jour l’adresse existante
+      console.log('✏️ Adresse existante → mise à jour');
       await axios.put(
         `${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
         { address: addressPayload },
-        { headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-          'Content-Type': 'application/json'
-        }}
+        {
+          headers: {
+            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
 
-    // Ajouter le numéro de TVA en tant que metafield (facultatif)
     if (vat) {
+      console.log('➕ Enregistrement TVA en tant que metafield');
       await axios.post(
         `${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`,
         {
