@@ -36,7 +36,8 @@ router.post('/', async (req, res) => {
     let noteData = {};
     try {
       if (customer.note) {
-        noteData = JSON.parse(customer.note);
+ console.log("📝 Note brute Shopify : ", customer.note);
+         noteData = JSON.parse(customer.note);
       }
     } catch (e) {
       console.warn('⚠️ Note non parsable :', customer.note);
