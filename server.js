@@ -214,16 +214,11 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// === enfin ===
+// =========================================
+// 10. LANCEMENT DU SERVEUR
+// =========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Serveur actif sur le port ${PORT}`);
 });
 
-// =========================================
-// 10. LANCEMENT DU SERVEUR
-// =========================================
-var PORT = process.env.PORT || 3000;
-app.listen(PORT, function() {
-  console.log('✅ Serveur actif sur le port ' + PORT);
-});
