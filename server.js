@@ -200,6 +200,27 @@ app.use('/', draftOrderRoutes);
 // =========================================
 
 // =========================================
+// 9.1 Middleware pour injecter CORS même sur erreur
+// =========================================
+app.use((err, req, res, next) => {
+  const origin = req.get('Origin');
+  if (origin && ALLOWED_ORIGINS.some(o =>
+        typeof o === 'string' ? o === origin : o.test(origin)
+      )) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+  }
+  next(err);
+});
+
+// === enfin ===
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Serveur actif sur le port ${PORT}`);
+});
+
+// =========================================
 // 10. LANCEMENT DU SERVEUR
 // =========================================
 var PORT = process.env.PORT || 3000;
