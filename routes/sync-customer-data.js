@@ -3,13 +3,11 @@ const axios = require('axios');
 const router = express.Router();
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
-const SHOPIFY_SHOP_DOMAIN = process.env.SHOPIFY_API_URL; // ex: your-shop.myshopify.com
-const API_VERSION = '2023-10';
-const baseUrl = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${API_VERSION}`;
+const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 
 router.post('/', async (req, res) => {
   if (!req.body || Object.keys(req.body).length === 0) {
-    return res.status(200).json({ message: 'Webhook OK' });
+    return res.status(200).json({ message: 'Webhook OK (ping)' });
   }
 
   const customerId = req.body.id;
@@ -19,8 +17,9 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    // 🔍 Récupérer les infos complètes du client
     const { data: { customer } } = await axios.get(
-      `${baseUrl}/customers/${customerId}.json`,
+      `${SHOPIFY_API_URL}/customers/${customerId}.json`,
       {
         headers: {
           'X-Shopify-Access-Token': SHOPIFY_API_KEY,
@@ -33,42 +32,41 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
+    // 📦 Lire le champ note (contenant un JSON)
     let noteData = {};
     try {
       if (customer.note) {
- console.log("📝 Note brute Shopify : ", customer.note);
-         noteData = JSON.parse(customer.note);
+        noteData = JSON.parse(customer.note);
       }
     } catch (e) {
       console.warn('⚠️ Note non parsable :', customer.note);
     }
 
-    const company = noteData.company?.trim();
-    const address1 = noteData.address1?.trim();
-    const zip = noteData.zip?.trim();
-    const city = noteData.city?.trim();
-    const vat = noteData.vat_number?.trim();
+    const company   = noteData.company?.trim();
+    const address1  = noteData.address1?.trim();
+    const zip       = noteData.zip?.trim();
+    const city      = noteData.city?.trim();
+    const vat       = noteData.vat_number?.trim();
 
-    console.log(`🔁 Traitement client : ${customer.email} (${customerId})`);
-    console.log(`→ Société : ${company}, Adresse : ${address1}, ${zip} ${city}, TVA : ${vat}`);
-
-    if (!company) {
-      console.warn(`⚠️ Le client ${customer.email} n’a pas de société renseignée.`);
-      return res.status(400).json({ error: 'Company is required' });
+    // 🛑 Rien à faire si aucun champ pertinent
+    if (!company && !address1 && !vat) {
+      console.log('ℹ️ Aucun champ utile trouvé dans la note. Fin du traitement.');
+      return res.status(200).json({ message: 'Nothing to update' });
     }
 
+    // 🏢 Création ou mise à jour de l'adresse client
     const addressPayload = {
       company,
-      address1: address1 || 'Adresse à compléter',
+      address1: address1 || 'To complete',
       zip: zip || '0000',
-      city: city || 'Ville à compléter',
+      city: city || 'To complete',
       default: true
     };
 
     if (!customer.default_address) {
-      console.log('➕ Aucune adresse existante → création');
+      console.log('➕ Création d’une adresse client');
       await axios.post(
-        `${baseUrl}/customers/${customerId}/addresses.json`,
+        `${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`,
         { address: addressPayload },
         {
           headers: {
@@ -78,9 +76,9 @@ router.post('/', async (req, res) => {
         }
       );
     } else {
-      console.log('✏️ Adresse existante → mise à jour');
+      console.log('✏️ Mise à jour de l’adresse existante');
       await axios.put(
-        `${baseUrl}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
+        `${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
         { address: addressPayload },
         {
           headers: {
@@ -91,10 +89,11 @@ router.post('/', async (req, res) => {
       );
     }
 
+    // 🔐 Ajout du champ TVA en tant que metafield
     if (vat) {
-      console.log('➕ Enregistrement TVA en tant que metafield');
+      console.log('➕ Ajout TVA en metafield');
       await axios.post(
-        `${baseUrl}/customers/${customerId}/metafields.json`,
+        `${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`,
         {
           metafield: {
             namespace: 'custom',
@@ -112,9 +111,9 @@ router.post('/', async (req, res) => {
       );
     }
 
-    res.json({ success: true });
+    res.status(200).json({ success: true });
   } catch (err) {
-    console.error("❌ sync-customer-data error:", err.response?.data || err.message);
+    console.error('❌ Erreur sync-customer-data :', err.response?.data || err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
