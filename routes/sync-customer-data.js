@@ -3,58 +3,33 @@ const axios = require('axios');
 const router = express.Router();
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
-const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
+const SHOPIFY_API_URL = `https://${process.env.SHOPIFY_API_URL}/admin/api/2023-10`;
 
 router.post('/', async (req, res) => {
-  if (!req.body || Object.keys(req.body).length === 0) {
-    return res.status(200).json({ message: 'Webhook OK (ping)' });
-  }
+  if (!req.body || !req.body.id) return res.status(200).json({ message: 'Ping OK' });
 
   const customerId = req.body.id;
 
-  if (!customerId) {
-    return res.status(400).json({ error: 'Missing customer ID' });
-  }
-
   try {
-    // 🔍 Récupérer les infos complètes du client
-    const { data: { customer } } = await axios.get(
-      `${SHOPIFY_API_URL}/customers/${customerId}.json`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-          'Content-Type': 'application/json'
-        }
+    const { data: { customer } } = await axios.get(`${SHOPIFY_API_URL}/customers/${customerId}.json`, {
+      headers: {
+        'X-Shopify-Access-Token': SHOPIFY_API_KEY
       }
-    );
+    });
 
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
-    }
-
-    // 📦 Lire le champ note (contenant un JSON)
     let noteData = {};
     try {
-      if (customer.note) {
-        noteData = JSON.parse(customer.note);
-      }
+      noteData = JSON.parse(customer.note || '{}');
     } catch (e) {
-      console.warn('⚠️ Note non parsable :', customer.note);
+      console.warn('⚠️ Note non JSON :', customer.note);
     }
 
-    const company   = noteData.company?.trim();
-    const address1  = noteData.address1?.trim();
-    const zip       = noteData.zip?.trim();
-    const city      = noteData.city?.trim();
-    const vat       = noteData.vat_number?.trim();
+    const { company, address1, zip, city, vat_number } = noteData;
 
-    // 🛑 Rien à faire si aucun champ pertinent
-    if (!company && !address1 && !vat) {
-      console.log('ℹ️ Aucun champ utile trouvé dans la note. Fin du traitement.');
+    if (!company && !address1 && !vat_number) {
       return res.status(200).json({ message: 'Nothing to update' });
     }
 
-    // 🏢 Création ou mise à jour de l'adresse client
     const addressPayload = {
       company,
       address1: address1 || 'To complete',
@@ -64,56 +39,31 @@ router.post('/', async (req, res) => {
     };
 
     if (!customer.default_address) {
-      console.log('➕ Création d’une adresse client');
-      await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`,
-        { address: addressPayload },
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      await axios.post(`${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`, { address: addressPayload }, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
+      });
     } else {
-      console.log('✏️ Mise à jour de l’adresse existante');
-      await axios.put(
-        `${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
-        { address: addressPayload },
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      await axios.put(`${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`, { address: addressPayload }, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
+      });
     }
 
-    // 🔐 Ajout du champ TVA en tant que metafield
-    if (vat) {
-      console.log('➕ Ajout TVA en metafield');
-      await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`,
-        {
-          metafield: {
-            namespace: 'custom',
-            key: 'vat_number',
-            value: vat,
-            type: 'single_line_text_field'
-          }
-        },
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-            'Content-Type': 'application/json'
-          }
+    if (vat_number) {
+      await axios.post(`${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`, {
+        metafield: {
+          namespace: 'custom',
+          key: 'vat_number',
+          value: vat_number,
+          type: 'single_line_text_field'
         }
-      );
+      }, {
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
+      });
     }
 
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error('❌ Erreur sync-customer-data :', err.response?.data || err.message);
+    console.error('❌ sync-customer-data error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
