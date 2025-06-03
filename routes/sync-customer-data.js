@@ -13,14 +13,10 @@ router.post('/', async (req, res) => {
   const customerId = req.body.id;
 
   try {
-    // 📥 Récupération des données complètes du client
     const { data: { customer } } = await axios.get(`${SHOPIFY_API_URL}/customers/${customerId}.json`, {
-      headers: {
-        'X-Shopify-Access-Token': SHOPIFY_API_KEY
-      }
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
     });
 
-    // 📦 Parsing du champ "note"
     let noteData = {};
     try {
       noteData = JSON.parse(customer.note || '{}');
@@ -28,18 +24,19 @@ router.post('/', async (req, res) => {
       console.warn('⚠️ Note invalide :', customer.note);
     }
 
+    console.log('📋 Données extraites de note:', noteData);
+
     const company     = noteData.company?.trim();
     const address1    = noteData.address1?.trim();
     const zip         = noteData.zip?.trim();
     const city        = noteData.city?.trim();
     const vat_number  = noteData.vat_number?.trim();
 
-    if (!company && !address1 && !vat_number) {
+    if (!company && !address1 && !zip && !city && !vat_number) {
       console.log('ℹ️ Aucun champ pertinent détecté.');
       return res.status(200).json({ message: 'No relevant data in note' });
     }
 
-    // 🏠 Préparer les données d’adresse
     const addressPayload = {
       company,
       address1: address1 || 'To complete',
@@ -53,22 +50,17 @@ router.post('/', async (req, res) => {
       await axios.post(`${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`, {
         address: addressPayload
       }, {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY
-        }
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
       });
     } else {
       console.log('✏️ Mise à jour de l’adresse existante');
       await axios.put(`${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`, {
         address: addressPayload
       }, {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY
-        }
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
       });
     }
 
-    // 💼 TVA -> Metafield
     if (vat_number) {
       console.log('➕ Ajout TVA en metafield');
       await axios.post(`${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`, {
@@ -79,9 +71,7 @@ router.post('/', async (req, res) => {
           type: 'single_line_text_field'
         }
       }, {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY
-        }
+        headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY }
       });
     }
 
