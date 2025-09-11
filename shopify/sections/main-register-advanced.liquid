@@ -1,0 +1,1165 @@
+{% comment %}
+Section: main-register-advanced (EN)
+Purpose: Corporate customer registration with all fields as dynamic blocks only.
+- Company fields and Delivery fields are provided as blocks (no hard-coded inputs).
+- Delivery address: same as company by default; accordion opens when "Use different" is checked.
+- Blocks with keys starting with "delivery_" are moved into the accordion.
+- Extra data serialized into customer[note] JSON.
+- Country & Day selectors via field_select (JS-populated).
+- Address autocomplete (EU) via optional setting (Geoapify by default).
+- Sends 2 emails via EmailJS (admin + user with CSV), then shows a Thank You screen (no Shopify account creation).
+{% endcomment %}
+
+<section class="regpro"
+  {% if section.settings.label_position == 'left' %} data-label-left="1"{% else %} data-label-left="0"{% endif %}>
+  <div class="regpro__wrap">
+    <header class="regpro__hdr">
+      <h1 class="regpro__ttl">{{ section.settings.title | escape }}</h1>
+      {% if section.settings.subtitle != blank %}
+        <p class="regpro__sub">{{ section.settings.subtitle }}</p>
+      {% endif %}
+    </header>
+
+    {%- form 'create_customer', id: 'RegisterForm', novalidate: true, class: 'regpro__form' -%}
+      {{ form.errors | default_errors }}
+
+      <div class="regpro__grid" id="CompanyGrid">
+        {% for block in section.blocks %}
+          {% assign type = block.type %}
+          {% assign width = block.settings.width %}
+          {% case type %}
+
+            {% when 'heading' %}
+              <div class="regpro__col--full" {{ block.shopify_attributes }}>
+                <h2 class="regpro__heading" style="text-align: {{ block.settings.align }}">{{ block.settings.text }}</h2>
+              </div>
+
+            {% when 'divider' %}
+              <div class="regpro__col--full" {{ block.shopify_attributes }}>
+                <hr class="regpro__divider">
+              </div>
+
+            {% when 'note' %}
+              <div class="regpro__col--full" {{ block.shopify_attributes }}>
+                <p class="regpro__note" style="text-align: {{ block.settings.align }}">{{ block.settings.text }}</p>
+              </div>
+
+            {% when 'field_text' %}
+              <div class="regpro__field {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   id="field-{{ block.id }}" data-size="{{ block.settings.size }}" {{ block.shopify_attributes }}>
+                <label class="regpro__lbl" for="fld-{{ block.id }}">{{ block.settings.label }}</label>
+                <input class="regpro__inp"
+                       id="fld-{{ block.id }}"
+                       data-key="{{ block.settings.key | strip | downcase }}"
+                       type="text"
+                       placeholder="{{ block.settings.placeholder }}"
+                       {% if block.settings.required %}required{% endif %}
+                       {% if block.settings.pattern != blank %}pattern="{{ block.settings.pattern }}"{% endif %}
+                       {% if block.settings.mask != 'none' %} data-mask="{{ block.settings.mask }}"{% endif %}>
+              </div>
+
+            {% when 'field_email' %}
+              <div class="regpro__field {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   id="field-{{ block.id }}" {{ block.shopify_attributes }}>
+                <label class="regpro__lbl" for="fld-{{ block.id }}">{{ block.settings.label }}</label>
+                <input class="regpro__inp"
+                       id="fld-{{ block.id }}"
+                       data-key="{{ block.settings.key | strip | downcase }}"
+                       type="email"
+                       placeholder="{{ block.settings.placeholder }}"
+                       {% if block.settings.required %}required{% endif %}>
+              </div>
+
+            {% when 'field_tel' %}
+              <div class="regpro__field {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   id="field-{{ block.id }}" {{ block.shopify_attributes }}>
+                <label class="regpro__lbl" for="fld-{{ block.id }}">{{ block.settings.label }}</label>
+                <input class="regpro__inp"
+                       id="fld-{{ block.id }}"
+                       data-key="{{ block.settings.key | strip | downcase }}"
+                       type="tel"
+                       placeholder="{{ block.settings.placeholder }}"
+                       {% if block.settings.required %}required{% endif %}
+                       data-mask="phone"
+                       pattern="^[0-9 +().-]{6,}$">
+              </div>
+
+            {% when 'field_number' %}
+              <div class="regpro__field {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   id="field-{{ block.id }}" {{ block.shopify_attributes }}>
+                <label class="regpro__lbl" for="fld-{{ block.id }}">{{ block.settings.label }}</label>
+                <input class="regpro__inp"
+                       id="fld-{{ block.id }}"
+                       data-key="{{ block.settings.key | strip | downcase }}"
+                       type="number" inputmode="numeric"
+                       placeholder="{{ block.settings.placeholder }}"
+                       {% if block.settings.required %}required{% endif %}>
+              </div>
+
+            {% when 'field_textarea' %}
+              <div class="regpro__field {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   id="field-{{ block.id }}" {{ block.shopify_attributes }}>
+                <label class="regpro__lbl" for="fld-{{ block.id }}">{{ block.settings.label }}</label>
+                <textarea class="regpro__inp regpro__inp--area"
+                          id="fld-{{ block.id }}"
+                          data-key="{{ block.settings.key | strip | downcase }}"
+                          rows="4"
+                          placeholder="{{ block.settings.placeholder }}"
+                          {% if block.settings.required %}required{% endif %}></textarea>
+              </div>
+
+            {% when 'field_select' %}
+              <div class="regpro__field {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   id="field-{{ block.id }}" data-size="{{ block.settings.size }}" {{ block.shopify_attributes }}>
+                <label class="regpro__lbl" for="fld-{{ block.id }}">{{ block.settings.label }}</label>
+                <select class="regpro__inp"
+                        id="fld-{{ block.id }}"
+                        data-key="{{ block.settings.key | strip | downcase }}"
+                        data-source="{{ block.settings.source }}"
+                        data-blank="{{ block.settings.include_blank }}"
+                        {% if block.settings.required %}required{% endif %}>
+                </select>
+              </div>
+
+            {% when 'spacer' %}
+              <div class="regpro__spacer {% if width == 'half' %}regpro__col--half{% else %}regpro__col--full{% endif %}"
+                   {% if block.settings.in_delivery %}data-delivery="1"{% endif %}
+                   style="height: {{ block.settings.height }}px;"
+                   aria-hidden="true"
+                   {{ block.shopify_attributes }}></div>
+
+          {% endcase %}
+        {% endfor %}
+      </div>
+
+      <!-- Delivery toggle + accordion (delivery blocks moved here by JS if key starts with "delivery_") -->
+      <div class="regpro__field regpro__col--full">
+        <div class="regpro__check">
+          <input class="regpro__chk" id="UseDifferent" type="checkbox">
+          <label class="regpro__chk-lbl" for="UseDifferent">{{ section.settings.delivery_toggle_label }}</label>
+        </div>
+      </div>
+
+      <div class="regpro__col--full" id="DeliveryContainer" hidden>
+        <h2 class="regpro__heading">{{ section.settings.delivery_title }}</h2>
+        <div class="regpro__accordion">
+          <div class="regpro__grid" id="DeliveryGrid"></div>
+        </div>
+      </div>
+
+      <!-- Honeypot anti-spam (ne pas supprimer) -->
+      <div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;">
+        <label for="HpWebsite">Your website</label>
+        <input type="text" id="HpWebsite" name="hp_website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <!-- Hidden native Shopify fields (kept for structure, not submitted) -->
+      <input type="hidden" name="customer[first_name]" id="NativeFirstName">
+      <input type="hidden" name="customer[last_name]" id="NativeLastName">
+      <input type="hidden" name="customer[email]" id="NativeEmail">
+      <input type="hidden" name="customer[password]" id="NativePassword">
+      <textarea name="customer[note]" id="CustomerNote" hidden></textarea>
+      <input type="hidden" name="customer[phone]" id="CustomerPhoneHidden">
+
+      <div class="regpro__actions">
+        <button type="submit" class="regpro__btn">{{ section.settings.button_label }}</button>
+        <!-- Le texte "Mandatory fields" sera injecté juste dessous par JS -->
+      </div>
+    {%- endform -%}
+
+    <!-- Thank You panel (hidden by default) -->
+    <div id="RegproThanks" class="regpro__thanks" hidden>
+      <div class="regpro__thanks-card">
+        <img class="regpro__thanks-img"
+             src="https://cdn.shopify.com/s/files/1/0489/4821/5967/files/Aspherique_2000x1400_84b042c3-5710-4db1-8fa3-7361990a8149.png?v=1755697367"
+             alt="Thank you"
+             width="160"
+             height="120">
+        <h2 class="regpro__thanks-ttl">Thank you!</h2>
+        <p class="regpro__thanks-txt">Your request has been sent. We’ll get back to you shortly.</p>
+        <a class="regpro__btn regpro__btn--ghost" href="{{ routes.root_url }}">Back to home</a>
+      </div>
+    </div>
+
+  </div>
+
+  <style>
+    .regpro__spacer{ visibility:hidden; pointer-events:none; }
+
+    .regpro{
+      --reg-columns: {{ section.settings.columns | default: 2 }};
+      --reg-gap: {{ section.settings.field_gap | default: 16 }}px;
+      --reg-inp-radius: {{ section.settings.input_radius | default: 8 }}px;
+      --reg-inp-height: {{ section.settings.input_height | default: 44 }}px;
+      --reg-btn-radius: {{ section.settings.button_radius | default: 24 }}px;
+      --reg-btn-bg: {{ section.settings.btn_bg | default: '#111111' }};
+      --reg-btn-fg: {{ section.settings.btn_fg | default: '#ffffff' }};
+      --reg-label-width: {{ section.settings.label_width | default: 28 }}%;
+      padding:48px 20px;background:{{ section.settings.bg }};color:{{ section.settings.fg }};
+    }
+    .regpro__wrap{max-width:960px;margin:0 auto;}
+    .regpro__hdr{text-align:left;margin-bottom:24px;}
+    .regpro__ttl{margin:0 0 8px;font-weight:600;letter-spacing:.2px;font-size:clamp(22px,2.6vw,28px);}
+    .regpro__sub{margin:0;opacity:.75;}
+    .regpro__form{margin-top:24px;}
+
+    .regpro__grid{display:grid;grid-template-columns:repeat(var(--reg-columns),1fr);gap:var(--reg-gap);}
+    .regpro__col--full{grid-column:1 / -1;}
+    .regpro__field{display:flex;flex-direction:column; position:relative;}
+    .regpro__heading{margin:12px 0 6px;font-size:clamp(18px,2.2vw,22px);font-weight:700;}
+    .regpro__divider{border:none;border-top:1px solid rgba(0,0,0,.12);margin:8px 0 16px;}
+    .regpro__note{margin:6px 0 10px;opacity:.9;}
+
+    /* Labels left layout */
+    .regpro[data-label-left="1"] .regpro__field{flex-direction:row;align-items:center;}
+    .regpro[data-label-left="1"] .regpro__lbl{width:var(--reg-label-width);margin:0 12px 0 0;text-align:right;}
+    .regpro__lbl{font-size:14px;margin-bottom:6px;font-weight:600;}
+
+    .regpro__inp{
+      appearance:none;border:1px solid rgba(0,0,0,.15);border-radius:var(--reg-inp-radius);
+      padding:12px 14px;font-size:16px;line-height:1.3;background:#fff;
+      transition:border-color .2s, box-shadow .2s;min-height:var(--reg-inp-height);width:100%;
+    }
+    .regpro__field[data-size="sm"] .regpro__inp{max-width:180px;}
+    .regpro__inp--area{resize:vertical;min-height:calc(var(--reg-inp-height) * 2.2);}
+    .regpro__inp:focus{outline:none;border-color:#4D61FC;box-shadow:0 0 0 3px rgba(77,97,252,.15);}
+    .regpro__hint{margin-top:6px;opacity:.7;font-size:12px;}
+
+    .regpro__actions{margin-top:20px;display:flex;flex-direction:column;gap:6px;justify-content:flex-start;align-items:flex-start;}
+    .regpro__btn{
+      border:0;
+      border-radius:var(--reg-btn-radius);
+      padding:12px 20px;
+      background:var(--reg-btn-bg);
+      color:var(--reg-btn-fg);
+      font-weight:600;
+      cursor:pointer;
+      transition:opacity .2s;
+      {% if section.settings.btn_uppercase %} text-transform:uppercase; letter-spacing:.3px; {% endif %}
+      {% if section.settings.btn_full %} width:100%; display:block; {% else %} display:inline-block; {% endif %}
+    }
+    .regpro__btn:hover{opacity:.9;}
+    .regpro__btn[disabled]{ opacity:.6; cursor:not-allowed; }
+    .regpro__btn--ghost{ background:transparent; color:inherit; border:1px solid rgba(0,0,0,.2); }
+
+    /* Accordion */
+    .regpro__accordion{padding:8px 0 0;}
+    [hidden] { display: none !important; }
+
+    /* Cache les champs delivery_* tant qu’ils ne sont pas déplacés */
+    #CompanyGrid [data-key^="delivery_"] { display: none; }
+    #CompanyGrid [data-delivery="1"] { display: none; }
+
+    /* Autocomplete dropdown */
+    .regpro__ac-list{
+      position:absolute; left:0; right:0; top:100%;
+      background:#fff; border:1px solid rgba(0,0,0,.15);
+      border-radius:8px; margin-top:4px; max-height:240px; overflow:auto;
+      box-shadow:0 6px 18px rgba(0,0,0,.08); z-index:25;
+    }
+    .regpro__ac-item{ padding:10px 12px; cursor:pointer; }
+    .regpro__ac-item:hover{ background:#f5f7fb; }
+    .regpro__ac-item.is-active{ background:#eef3ff; }
+
+    /* Astérisque rouge pour les champs requis */
+    .regpro__field[data-required="1"] .regpro__lbl::before{
+      content: "*";
+      display:inline-block;
+      margin-right:4px;
+      color:#B00020;
+      font-weight:700;
+      line-height:1;
+    }
+
+    /* Thank you panel */
+    .regpro__thanks{ display:flex; justify-content:center; align-items:center; padding:48px 0; }
+    .regpro__thanks-card{
+      max-width:560px; text-align:center; margin:0 auto; padding:24px;
+      border:1px solid rgba(0,0,0,.08); border-radius:16px; background:#fff;
+      box-shadow:0 8px 24px rgba(0,0,0,.06);
+    }
+    .regpro__thanks-img{ width:160px; height:auto; margin:8px auto 16px; display:block; }
+    .regpro__thanks-ttl{ margin:0 0 8px; font-size:clamp(22px,2.6vw,28px); }
+    .regpro__thanks-txt{ margin:0 0 16px; opacity:.8; }
+
+    .regpro__mandatory-hint{ color:#B00020; margin-top:6px; font-size:12px; }
+
+    @media (max-width: 768px){
+      .regpro__grid{grid-template-columns:1fr;}
+      .regpro[data-label-left="1"] .regpro__field{flex-direction:column;align-items:stretch;}
+      .regpro[data-label-left="1"] .regpro__lbl{width:auto;margin:0 0 6px 0;text-align:left;}
+    }
+  </style>
+
+  <script>
+  /* ================= CORE (selects + accordion + required + button lock) ================ */
+  (function(){
+    var form = document.getElementById('RegisterForm');
+    if (!form) return;
+
+    /* ---- Data ---- */
+    var DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+    var COUNTRIES = [
+      "Switzerland","France","Germany","Italy","Austria","Belgium","Netherlands","Luxembourg","United Kingdom","Ireland","Spain","Portugal",
+      "Norway","Sweden","Finland","Denmark","Iceland","Czechia","Poland","Hungary","Slovakia","Slovenia","Croatia","Romania","Bulgaria",
+      "Greece","Cyprus","Malta","Estonia","Latvia","Lithuania","United States","Canada","Mexico","Brazil","Argentina","Chile",
+      "Australia","New Zealand","Japan","China","Hong Kong SAR","Singapore","South Korea","India","United Arab Emirates","Saudi Arabia","Israel","Turkey","South Africa"
+    ];
+
+    /* ---- Populate <select data-source> ---- */
+    function populateSelect(el){
+      var src = (el.getAttribute('data-source') || '').toLowerCase();
+      var blank = el.getAttribute('data-blank') || 'Select...';
+      el.innerHTML = '';
+      var opt0 = document.createElement('option'); opt0.value = ''; opt0.textContent = blank; el.appendChild(opt0);
+      var list = [];
+      if (src === 'days') list = DAYS;
+      else if (src === 'countries') list = COUNTRIES;
+      list.forEach(function(x){ var o = document.createElement('option'); o.value = x; o.textContent = x; el.appendChild(o); });
+    }
+    function initSelects(scope){
+      var rootEl = scope || form;
+      Array.prototype.slice.call(rootEl.querySelectorAll('select[data-source]')).forEach(populateSelect);
+    }
+    initSelects();
+
+    // (re)peuple le select pays si besoin
+    (function(){
+      var countrySel = form.querySelector('select[data-key="country"][data-source]');
+      if (countrySel && countrySel.options.length <= 1) { populateSelect(countrySel); }
+    })();
+
+    /* ---- Masks ---- */
+    function formatIBAN(v){ v = v.toUpperCase().replace(/[^A-Z0-9]/g,''); return v.replace(/(.{4})/g,'$1 ').trim(); }
+    function formatSWIFT(v){ return v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,11); }
+    function formatVATCHE(v){
+      v = v.toUpperCase().replace(/[^A-Z0-9]/g,'');
+      var digits = v.replace(/^CHE/,'').replace(/[^0-9]/g,'').slice(0,9);
+      var out = 'CHE'; if (digits.length){ out += '-' + digits.replace(/(\d{3})(\d{3})(\d{0,3}).*/, function(_,a,b,c){ return a + '.' + b + (c ? '.'+c : ''); }); }
+      return out.trim();
+    }
+    function formatPhone(v){ return v.replace(/[^0-9 +().-]/g,''); }
+    form.addEventListener('input', function(e){
+      var el = e.target, mask = el.getAttribute('data-mask'); if (!mask) return;
+      var prev = el.value, next = prev;
+      if (mask === 'iban'){ next = formatIBAN(prev); el.setAttribute('pattern'); }
+      else if (mask === 'swift'){ next = formatSWIFT(prev); el.setAttribute('pattern','^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$'); }
+      else if (mask === 'vat_che'){
+        next = formatVATCHE(prev);   // formatage visuel
+        el.removeAttribute('pattern'); // pas de regex bloquante
+        try { el.setCustomValidity(''); } catch(_) {}
+      }
+      else if (mask === 'phone'){ next = formatPhone(prev); el.setAttribute('pattern','^[0-9 +().-]{6,}$'); }
+      else if (mask === 'int'){ next = prev.replace(/[^0-9]/g,''); }
+      if (next !== prev){ el.value = next; }
+    });
+
+    /* ---- Accordion (move + toggle) ---- */
+    var useDiff = document.getElementById('UseDifferent');
+    var deliveryBox = document.getElementById('DeliveryContainer');
+    var deliveryGrid = document.getElementById('DeliveryGrid');
+
+    function moveDeliveryFields(){
+      if (!deliveryGrid) return;
+      var grid = document.getElementById('CompanyGrid');
+      if (!grid) return;
+      var kids = Array.prototype.slice.call(grid.children);
+      var deliveryIdx = [];
+      for (var i = 0; i < kids.length; i++){
+        var el = kids[i];
+        if (el.querySelector && el.querySelector('[data-key^="delivery_"]')) deliveryIdx.push(i);
+        else if (el.hasAttribute && el.hasAttribute('data-delivery')) deliveryIdx.push(i);
+      }
+      if (!deliveryIdx.length) return;
+      var first = Math.min.apply(null, deliveryIdx);
+      var last  = Math.max.apply(null, deliveryIdx);
+      for (var j = first; j <= last; j++){
+        var el = kids[j];
+        if (!el || el.parentNode !== grid) continue;
+        var isDeliveryField = el.querySelector && el.querySelector('[data-key^="delivery_"]');
+        var isMarkedSpacer  = el.hasAttribute && el.hasAttribute('data-delivery');
+        var isNeutralSpacer = el.classList && el.classList.contains('regpro__spacer');
+        if (isDeliveryField || isMarkedSpacer || isNeutralSpacer){
+          deliveryGrid.appendChild(el);
+        }
+      }
+    }
+
+    function setDeliveryEnabled(enabled){
+      if (!deliveryBox) return;
+      if (enabled){ deliveryBox.removeAttribute('hidden'); deliveryBox.style.display=''; }
+      else { deliveryBox.setAttribute('hidden',''); deliveryBox.style.display='none'; }
+      if (deliveryGrid){
+        var ctrls = deliveryGrid.querySelectorAll('input, select, textarea');
+        Array.prototype.forEach.call(ctrls, function(el){
+          el.disabled = !enabled;
+          if (!enabled){
+            if (el.type === 'checkbox' || el.type === 'radio'){ el.checked = false; } else { el.value = ''; }
+          }
+        });
+      }
+      checkFormValidity();
+    }
+
+    var STATE_KEY = 'regpro_useDifferent';
+    function loadAccordionState(){ try{ var v = localStorage.getItem(STATE_KEY); return (v===null)?null:(v==='1'); }catch(e){ return null; } }
+    function saveAccordionState(on){ try{ localStorage.setItem(STATE_KEY, on?'1':'0'); }catch(e){} }
+
+    function initAccordion(){
+      useDiff = document.getElementById('UseDifferent');
+      deliveryBox = document.getElementById('DeliveryContainer');
+      deliveryGrid = document.getElementById('DeliveryGrid');
+      moveDeliveryFields();
+      initSelects(form);
+      if (useDiff){
+        var persisted = loadAccordionState();
+        if (persisted !== null) useDiff.checked = persisted;
+      }
+      setDeliveryEnabled(!!(useDiff && useDiff.checked));
+    }
+    function handleToggle(){
+      var cb = document.getElementById('UseDifferent'); if (!cb) return;
+      setDeliveryEnabled(!!cb.checked); saveAccordionState(!!cb.checked);
+    }
+    var regproListenersBound = false;
+    function bindAccordionListeners(){
+      if (regproListenersBound) return;
+      document.addEventListener('change', function(e){ if (e.target && e.target.id==='UseDifferent'){ handleToggle(); } });
+      document.addEventListener('click', function(e){
+        var t=e.target; if (!t) return;
+        if (t.id==='UseDifferent' || (t.getAttribute && t.getAttribute('for')==='UseDifferent')) handleToggle();
+      });
+      document.addEventListener('keyup', function(e){ if (e.target && e.target.id==='UseDifferent' && (e.key===' '||e.key==='Enter')) handleToggle(); });
+      regproListenersBound = true;
+    }
+
+    document.addEventListener('shopify:section:load',  function(e){ initAccordion(); initSelects(e.target); });
+    document.addEventListener('shopify:section:select',function(e){ initAccordion(); initSelects(e.target); });
+    document.addEventListener('shopify:block:select', initAccordion);
+    document.addEventListener('shopify:block:reorder',initAccordion);
+    document.addEventListener('shopify:section:deselect',initAccordion);
+    document.addEventListener('shopify:block:deselect', initAccordion);
+    bindAccordionListeners();
+    initAccordion();
+
+    /* ---- Required fields + disable submit until valid ---- */
+    var REQUIRED_KEYS = ['company_name','company_registration','vat','street','number','postcode','city','country','email'];
+    var submitBtn = form.querySelector('.regpro__btn');
+
+    function relaxOptionalFields(){
+      ['contact_person','telephone','finance_email'].forEach(function(k){
+        var el = form.querySelector('[data-key="'+k+'"]');
+        if (!el) return;
+        el.required = false;
+        el.setAttribute('aria-required','false');
+        el.removeAttribute('aria-invalid');
+        var wrap = el.closest('.regpro__field');
+        if (wrap) wrap.removeAttribute('data-required');
+        try { el.setCustomValidity(''); } catch(_) {}
+      });
+    }
+    relaxOptionalFields();
+
+    (function(){
+      var vat = form.querySelector('[data-key="vat"]');
+      if (!vat) return;
+      vat.removeAttribute('data-mask');
+      vat.removeAttribute('pattern');
+      try { vat.setCustomValidity(''); } catch(e){}
+    })();
+
+    function markRequired(){
+      REQUIRED_KEYS.forEach(function(k){
+        var el = form.querySelector('[data-key="'+k+'"]');
+        if (!el) return;
+        el.required = true;
+        el.setAttribute('aria-required','true');
+        var wrap = el.closest('.regpro__field');
+        if (wrap) wrap.setAttribute('data-required','1');
+      });
+    }
+
+    function checkFormValidity(){
+      if (!submitBtn) return;
+      submitBtn.disabled = !form.checkValidity();
+    }
+
+    markRequired();
+    form.addEventListener('input',  checkFormValidity);
+    form.addEventListener('change', checkFormValidity);
+    checkFormValidity();
+
+    function addMandatoryHint(){
+      var actions = form.querySelector('.regpro__actions');
+      if (!actions) { setTimeout(addMandatoryHint, 0); return; }
+      if (actions.querySelector('.regpro__mandatory-hint')) return;
+      var hint = document.createElement('div');
+      hint.className = 'regpro__mandatory-hint';
+      hint.textContent = '*Mandatory fields';
+      actions.appendChild(hint);
+    }
+    addMandatoryHint();
+  })();
+
+  /* ================= Address Autocomplete (EU) ================= */
+  (function(){
+    try{
+      var form = document.getElementById('RegisterForm'); if (!form) return;
+
+      var AC_ENABLED   = {{ section.settings.enable_autocomplete | json }};
+      var AC_PROVIDER  = {{ section.settings.ac_provider | json }};
+      var AC_KEY       = {{ section.settings.ac_api_key | json }};
+      var AC_COUNTRIES = ({{ section.settings.ac_countries | json }} || '')
+        .split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean);
+      if (!AC_COUNTRIES.length){ AC_COUNTRIES = ["at","be","bg","hr","cy","cz","dk","ee","fi","fr","de","gr","hu","ie","it","lv","lt","lu","mt","nl","pl","pt","ro","sk","si","es","se","is","li","no","ch","gb"]; }
+
+      var ISO2 = {"Switzerland":"ch","France":"fr","Germany":"de","Italy":"it","Austria":"at","Belgium":"be","Netherlands":"nl","Luxembourg":"lu","United Kingdom":"gb","Ireland":"ie","Spain":"es","Portugal":"pt","Norway":"no","Sweden":"se","Finland":"fi","Denmark":"dk","Iceland":"is","Czechia":"cz","Poland":"pl","Hungary":"hu","Slovakia":"sk","Slovenia":"si","Croatia":"hr","Romania":"ro","Bulgaria":"bg","Greece":"gr","Cyprus":"cy","Malta":"mt","Estonia":"ee","Latvia":"lv","Lithuania":"lt","United States":"us","Canada":"ca","Mexico":"mx","Brazil":"br","Argentina":"ar","Chile":"cl","Australia":"au","New Zealand":"nz","Japan":"jp","China":"cn","Hong Kong SAR":"hk","Singapore":"sg","South Korea":"kr","India":"in","United Arab Emirates":"ae","Saudi Arabia":"sa","Israel":"il","Turkey":"tr","South Africa":"za"};
+      var ISO2_LC = {}; Object.keys(ISO2).forEach(function(k){ ISO2_LC[k.toLowerCase()] = ISO2[k].toLowerCase(); });
+
+      function root(){ return form; }
+      function byKey(key){ return root().querySelector('[data-key="'+key+'"]'); }
+
+      function ensureList(container){
+        var ul = container.querySelector('.regpro__ac-list');
+        if (!ul){ ul = document.createElement('div'); ul.className = 'regpro__ac-list'; container.appendChild(ul); }
+        ul.innerHTML = ''; return ul;
+      }
+      function clearList(container){ var ul = container.querySelector('.regpro__ac-list'); if (ul) ul.innerHTML = ''; }
+
+      function currentCountryCode(countryEl){
+        if (!countryEl) return '';
+        if (countryEl.tagName === 'SELECT'){
+          var val = (countryEl.value||'').trim().toLowerCase();
+          var txt = ((countryEl.options[countryEl.selectedIndex]||{}).textContent || '').toLowerCase();
+          if (val && val.length === 2) return val;
+          return ISO2_LC[val] || ISO2_LC[txt] || '';
+        } else {
+          var v = (countryEl.value||'').trim().toLowerCase();
+          if (v && v.length === 2) return v;
+          return ISO2_LC[v] || '';
+        }
+      }
+
+      (function showKeyWarningOnce(){
+        if (!AC_ENABLED) return;
+        var looksBad = !AC_KEY || AC_KEY === 'PASTE_KEY_HERE' || AC_KEY.length < 15;
+        if (!looksBad) return;
+        var street = byKey('street'); if (!street) return;
+        var wrap = street.closest('.regpro__field'); if (!wrap) return;
+        var warn = document.createElement('div');
+        warn.className = 'regpro__hint'; warn.style.color = '#B00020';
+        warn.textContent = 'Address autocomplete activé mais clé API absente/invalide (section settings).';
+        wrap.appendChild(warn);
+      })();
+
+      async function geoapifySuggest(q, iso2){
+        var filter = (iso2 && iso2.length===2) ? 'countrycode:'+iso2 : (AC_COUNTRIES.length ? 'countrycode:'+AC_COUNTRIES.join(',') : '');
+        var url = 'https://api.geoapify.com/v1/geocode/autocomplete?text='+encodeURIComponent(q)+(filter ? '&filter='+encodeURIComponent(filter) : '')+'&limit=8&format=json&apiKey='+encodeURIComponent(AC_KEY);
+        try{
+          var r = await fetch(url, {mode:'cors'});
+          if (!r.ok){ console.error('Geoapify error', r.status, await r.text()); return []; }
+          var data = await r.json();
+          var results = (data && (data.results || data.features)) ? (data.results || (data.features.map(function(f){return f.properties;}))) : [];
+          return results.map(function(p){
+            return {
+              label: (p.formatted || [p.address_line1, p.address_line2].filter(Boolean).join(', ')),
+              street: p.street || p.address_line1 || '', number: p.housenumber || '',
+              postcode: p.postcode || '', city: p.city || p.town || p.village || '',
+              country: p.country || '', country_code: (p.country_code || '').toUpperCase()
+            };
+          });
+        }catch(e){ console.error('Geoapify fetch failed', e); return []; }
+      }
+      async function suggest(q, iso2){
+        if (!AC_ENABLED) return [];
+        if (!AC_KEY || AC_KEY === 'PASTE_KEY_HERE'){ console.warn('[AC] Clé API manquante/invalide'); return []; }
+        if (AC_PROVIDER === 'geoapify') return geoapifySuggest(q, iso2);
+        return [];
+      }
+
+      /* ---------- LOOKUPS (mutual update city <-> postcode) ---------- */
+      async function lookupByPostcode(pc, countryEl, cityEl, postcodeEl){
+        pc = (pc || '').toString().trim();
+        if (!pc) return;
+
+        var iso2 = currentCountryCode(countryEl) || '';
+        var items = await suggest(pc, iso2);
+        if (!items || !items.length) return;
+
+        var exact = items.filter(function(it){ return (it.postcode || '').toString() === pc; });
+        var best = exact[0] || items[0];
+
+        if (postcodeEl && best.postcode && postcodeEl !== document.activeElement){
+          if (postcodeEl.value !== best.postcode){ postcodeEl.value = best.postcode; }
+        }
+        if (cityEl && best.city && (cityEl.value || '').toLowerCase() !== (best.city || '').toLowerCase()){
+          cityEl.value = best.city;
+        }
+
+        if (countryEl){
+          var wantCode = (best.country_code || '').toLowerCase();
+          var wantName = (best.country || '').toLowerCase();
+          if (countryEl.tagName === 'SELECT'){
+            var opts = Array.prototype.slice.call(countryEl.options);
+            var match = opts.find(function(o){
+              var ov = (o.value || '').toLowerCase();
+              var ot = (o.textContent || '').toLowerCase();
+              return ov === wantName || ot === wantName || ISO2_LC[ov] === wantCode || ISO2_LC[ot] === wantCode;
+            });
+            if (match) countryEl.value = match.value;
+          } else {
+            if (!countryEl.value || countryEl.value.toLowerCase() !== wantName){
+              countryEl.value = best.country || countryEl.value;
+            }
+          }
+        }
+      }
+
+      async function lookupByCity(cityName, countryEl, cityEl, postcodeEl){
+        cityName = (cityName || '').trim();
+        if (!cityName) return;
+
+        var iso2 = currentCountryCode(countryEl) || '';
+        var items = await suggest(cityName, iso2);
+        if (!items || !items.length) return;
+
+        var cname = cityName.toLowerCase();
+        var exact = items.filter(function(it){ return (it.city || '').toLowerCase() === cname; });
+        var best = exact[0] || items.find(function(it){ return !!it.city; }) || items[0];
+
+        if (cityEl && best.city && (cityEl.value || '').toLowerCase() !== (best.city || '').toLowerCase()){
+          cityEl.value = best.city;
+        }
+        if (postcodeEl && best.postcode && postcodeEl.value !== best.postcode){
+          postcodeEl.value = best.postcode;
+        }
+
+        if (countryEl){
+          var wantCode = (best.country_code || '').toLowerCase();
+          var wantName = (best.country || '').toLowerCase();
+          if (countryEl.tagName === 'SELECT'){
+            var opts = Array.prototype.slice.call(countryEl.options);
+            var match = opts.find(function(o){
+              var ov = (o.value || '').toLowerCase();
+              var ot = (o.textContent || '').toLowerCase();
+              return ov === wantName || ot === wantName || ISO2_LC[ov] === wantCode || ISO2_LC[ot] === wantCode;
+            });
+            if (match) countryEl.value = match.value;
+          } else {
+            if (!countryEl.value || countryEl.value.toLowerCase() !== wantName){
+              countryEl.value = best.country || countryEl.value;
+            }
+          }
+        }
+      }
+
+      function attachAddressAutocomplete(prefix){
+        var street   = byKey(prefix + 'street'); if (!street) return;
+        var number   = byKey(prefix + 'number');
+        var postcode = byKey(prefix + 'postcode');
+        var city     = byKey(prefix + 'city');
+        var country  = byKey(prefix + 'country');
+
+        if (street)   street.setAttribute('autocomplete','address-line1');
+        if (number)   number.setAttribute('autocomplete','on');
+        if (postcode) postcode.setAttribute('autocomplete','postal-code');
+        if (city)     city.setAttribute('autocomplete','address-level2');
+        if (country)  (country.tagName === 'SELECT' ? country.setAttribute('autocomplete','country') : country.setAttribute('autocomplete','country-name'));
+
+        if (!AC_ENABLED){
+          console.warn('[AC] Désactivé dans les settings.');
+          return;
+        }
+        if (!AC_KEY || AC_KEY === 'PASTE_KEY_HERE'){
+          var wrapWarn = street.closest('.regpro__field');
+          if (wrapWarn && !wrapWarn.querySelector('.regpro__hint[data-ac]')){
+            var w = document.createElement('div');
+            w.className = 'regpro__hint'; w.dataset.ac='1'; w.style.color = '#B00020';
+            w.textContent = 'Autocomplete désactivé: ajoutez une clé API valide dans la section.';
+            wrapWarn.appendChild(w);
+          }
+          console.warn('[AC] Clé API manquante/invalide.');
+          return;
+        }
+
+        /* ===== Street suggestions + keyboard ===== */
+        var wrap = street.closest('.regpro__field');
+        var stPending = 0, stItems = [], stActive = -1;
+
+        function stSetActive(i){
+          var list = wrap.querySelector('.regpro__ac-list'); if (!list) return;
+          var items = list.querySelectorAll('.regpro__ac-item');
+          items.forEach(function(el){ el.classList.remove('is-active'); });
+          if (i >= 0 && i < items.length){
+            items[i].classList.add('is-active');
+            items[i].scrollIntoView({ block: 'nearest' });
+          }
+          stActive = i;
+        }
+        function stChoose(i){
+          if (i < 0 || i >= stItems.length) return;
+          var it = stItems[i];
+          street.value = (it.street || '').trim();
+          if (number){ number.value = it.number || number.value || ''; }
+          if (postcode) postcode.value = it.postcode || '';
+          if (city)     city.value     = it.city || '';
+          if (country){
+            if (country.tagName === 'SELECT'){
+              var wantCode = (it.country_code || '').toLowerCase();
+              var wantName = (it.country || '').toLowerCase();
+              var opts = Array.prototype.slice.call(country.options);
+              var match = opts.find(function(o){
+                var ov = (o.value||'').toLowerCase(), ot = (o.textContent||'').toLowerCase();
+                return ov === wantName || ot === wantName || ISO2_LC[ov] === wantCode || ISO2_LC[ot] === wantCode;
+              });
+              if (match) country.value = match.value;
+            } else {
+              country.value = it.country || country.value || '';
+            }
+          }
+          clearList(wrap); stActive = -1;
+        }
+        function stRender(items){
+          stItems = items.slice(0);
+          var list = ensureList(wrap); list.innerHTML = '';
+          items.forEach(function(it, idx){
+            var div = document.createElement('div');
+            div.className = 'regpro__ac-item';
+            div.textContent = it.label;
+            div.addEventListener('mouseenter', function(){ stSetActive(idx); });
+            div.addEventListener('mousedown', function(e){ e.preventDefault(); stChoose(idx); });
+            list.appendChild(div);
+          });
+        }
+
+        street.addEventListener('input', function(){
+          var q = (street.value || '').trim();
+          if (q.length < 3){ clearList(wrap); stActive = -1; return; }
+          var seq = ++stPending;
+          var iso2 = currentCountryCode(country);
+          suggest(q, iso2).then(function(items){
+            if (seq !== stPending) return;
+            if (!items || !items.length){ clearList(wrap); return; }
+            stRender(items);
+          }).catch(function(err){ console.error('AC pipeline error', err); });
+        });
+
+        street.addEventListener('keydown', function(e){
+          var list = wrap.querySelector('.regpro__ac-list');
+          var open = list && list.children && list.children.length;
+          if (!open) return;
+          if (e.key === 'ArrowDown'){ e.preventDefault(); stSetActive(Math.min(stActive+1, stItems.length-1)); }
+          else if (e.key === 'ArrowUp'){ e.preventDefault(); stSetActive(Math.max(stActive-1, 0)); }
+          else if (e.key === 'Enter'){ e.preventDefault(); if (stActive < 0) stSetActive(0); stChoose(stActive); }
+          else if (e.key === 'Tab'){ if (stActive >= 0) stChoose(stActive); }
+          else if (e.key === 'Escape'){ clearList(wrap); stActive = -1; }
+        });
+
+        street.addEventListener('blur', function(){ setTimeout(function(){ clearList(wrap); stActive = -1; }, 120); });
+
+        /* ====== AUTOCOMPLETE CITY ====== */
+        if (city){
+          var cityPending = 0, cityItems = [], cityActive = -1;
+          var cityWrap = city.closest('.regpro__field');
+
+          function citySetActive(i){
+            var list = cityWrap.querySelector('.regpro__ac-list'); if (!list) return;
+            var items = list.querySelectorAll('.regpro__ac-item');
+            items.forEach(function(el){ el.classList.remove('is-active'); });
+            if (i >= 0 && i < items.length){
+              items[i].classList.add('is-active');
+              items[i].scrollIntoView({ block: 'nearest' });
+            }
+            cityActive = i;
+          }
+          function cityChoose(i){
+            if (i < 0 || i >= cityItems.length) return;
+            var it = cityItems[i];
+            city.value = it.city || '';
+            if (postcode && it.postcode){
+              if (postcode.value !== it.postcode) postcode.value = it.postcode;
+            }
+            if (country){
+              if (country.tagName === 'SELECT'){
+                var want = (it.country_code || '').toLowerCase() || (it.country || '').toLowerCase();
+                Array.prototype.slice.call(country.options).some(function(o){
+                  var ov = (o.value||'').toLowerCase(), ot = (o.textContent||'').toLowerCase();
+                  if (ov === want || ot === want){ country.value = o.value; return true; }
+                  return false;
+                });
+              } else {
+                if (!country.value) country.value = it.country || '';
+              }
+            }
+            clearList(cityWrap); cityActive = -1;
+          }
+          function cityRender(items){
+            cityItems = items.slice(0);
+            var list = ensureList(cityWrap); list.innerHTML = '';
+            items.forEach(function(it, idx){
+              var div = document.createElement('div');
+              div.className = 'regpro__ac-item';
+              div.textContent = (it.city || '') + (it.postcode ? ' ('+it.postcode+')' : '');
+              div.addEventListener('mouseenter', function(){ citySetActive(idx); });
+              div.addEventListener('mousedown', function(e){ e.preventDefault(); cityChoose(idx); });
+              list.appendChild(div);
+            });
+          }
+
+          city.addEventListener('input', function(){
+            var q = (city.value || '').trim();
+            if (q.length < 2){ clearList(cityWrap); cityActive = -1; return; }
+            var seq = ++cityPending;
+            var iso2 = currentCountryCode(country);
+            suggest(q, iso2).then(function(items){
+              if (seq !== cityPending) return;
+              var seen = {}, out = [];
+              (items || []).forEach(function(it){
+                var key = (it.city||'') + '|' + (it.postcode||'');
+                if (it.city && !seen[key]){ seen[key] = 1; out.push({city: it.city, postcode: it.postcode, country: it.country, country_code: it.country_code}); }
+              });
+              if (!out.length){ clearList(cityWrap); return; }
+              cityRender(out);
+            }).catch(console.error);
+          });
+
+          city.addEventListener('keydown', function(e){
+            var list = cityWrap.querySelector('.regpro__ac-list');
+            var open = list && list.children && list.children.length;
+            if (!open) return;
+            if (e.key === 'ArrowDown'){ e.preventDefault(); citySetActive(Math.min(cityActive+1, cityItems.length-1)); }
+            else if (e.key === 'ArrowUp'){ e.preventDefault(); citySetActive(Math.max(cityActive-1, 0)); }
+            else if (e.key === 'Enter'){ e.preventDefault(); if (cityActive < 0) citySetActive(0); cityChoose(cityActive); }
+            else if (e.key === 'Tab'){ if (cityActive >= 0) cityChoose(cityActive); }
+            else if (e.key === 'Escape'){ clearList(cityWrap); cityActive = -1; }
+          });
+
+          city.addEventListener('blur', function(){ setTimeout(function(){ clearList(cityWrap); }, 120); });
+
+          var cityTimer = null;
+          function triggerCityLookup(){
+            var val = (city.value || '').trim();
+            if (val.length < 2) return;
+            clearTimeout(cityTimer);
+            cityTimer = setTimeout(function(){ lookupByCity(val, country, city, postcode); }, 200);
+          }
+          city.addEventListener('change', triggerCityLookup);
+          city.addEventListener('blur', function(){ setTimeout(triggerCityLookup, 0); });
+        }
+
+        /* ====== AUTOCOMPLETE POSTCODE ====== */
+        if (postcode){
+          var pcPending = 0, pcItems = [], pcActive = -1;
+          var pcWrap = postcode.closest('.regpro__field');
+
+          function pcSetActive(i){
+            var list = pcWrap.querySelector('.regpro__ac-list'); if (!list) return;
+            var items = list.querySelectorAll('.regpro__ac-item');
+            items.forEach(function(el){ el.classList.remove('is-active'); });
+            if (i >= 0 && i < items.length){
+              items[i].classList.add('is-active');
+              items[i].scrollIntoView({ block: 'nearest' });
+            }
+            pcActive = i;
+          }
+          function pcChoose(i){
+            if (i < 0 || i >= pcItems.length) return;
+            var it = pcItems[i];
+            if (postcode) postcode.value = it.postcode || '';
+            if (city && it.city && (city.value||'').toLowerCase() !== (it.city||'').toLowerCase()){
+              city.value = it.city;
+            }
+            if (country){
+              if (country.tagName === 'SELECT'){
+                var want = (it.country_code || '').toLowerCase() || (it.country || '').toLowerCase();
+                Array.prototype.slice.call(country.options).some(function(o){
+                  var ov = (o.value||'').toLowerCase(), ot = (o.textContent||'').toLowerCase();
+                  if (ov === want || ot === want){ country.value = o.value; return true; }
+                  return false;
+                });
+              } else {
+                if (!country.value) country.value = it.country || '';
+              }
+            }
+            clearList(pcWrap); pcActive = -1;
+          }
+          function pcRender(items){
+            pcItems = items.slice(0);
+            var list = ensureList(pcWrap); list.innerHTML = '';
+            items.forEach(function(it, idx){
+              var div = document.createElement('div');
+              div.className = 'regpro__ac-item';
+              div.textContent = (it.postcode || '') + (it.city ? ' — ' + it.city : '');
+              div.addEventListener('mouseenter', function(){ pcSetActive(idx); });
+              div.addEventListener('mousedown', function(e){ e.preventDefault(); pcChoose(idx); });
+              list.appendChild(div);
+            });
+          }
+
+          postcode.addEventListener('input', function(){
+            var q = (postcode.value || '').trim();
+            if (q.length < 2){ clearList(pcWrap); pcActive = -1; return; }
+            var seq = ++pcPending;
+            var iso2 = currentCountryCode(country);
+            suggest(q, iso2).then(function(items){
+              if (seq !== pcPending) return;
+              var seen = {}, out = [];
+              (items || []).forEach(function(it){
+                var pc = (it.postcode || '').toString(); if (!pc) return;
+                var key = pc + '|' + (it.city || '');
+                if (!seen[key]){ seen[key] = 1; out.push({postcode: pc, city: it.city, country: it.country, country_code: it.country_code}); }
+              });
+              if (!out.length){ clearList(pcWrap); return; }
+              pcRender(out);
+            }).catch(console.error);
+          });
+
+          postcode.addEventListener('keydown', function(e){
+            var list = pcWrap.querySelector('.regpro__ac-list');
+            var open = list && list.children && list.children.length;
+            if (!open) return;
+            if (e.key === 'ArrowDown'){ e.preventDefault(); pcSetActive(Math.min(pcActive+1, pcItems.length-1)); }
+            else if (e.key === 'ArrowUp'){ e.preventDefault(); pcSetActive(Math.max(pcActive-1, 0)); }
+            else if (e.key === 'Enter'){ e.preventDefault(); if (pcActive < 0) pcSetActive(0); pcChoose(pcActive); }
+            else if (e.key === 'Tab'){ if (pcActive >= 0) pcChoose(pcActive); }
+            else if (e.key === 'Escape'){ clearList(pcWrap); pcActive = -1; }
+          });
+
+          postcode.addEventListener('blur', function(){ setTimeout(function(){ clearList(pcWrap); }, 120); });
+
+          var pcTimer = null;
+          var lastPc = (postcode.value || '').trim();
+          function triggerPcLookup(force){
+            var val  = (postcode.value || '').trim();
+            var prev = lastPc;
+            lastPc   = val;
+            if (val.length < 3 && !force) return;
+            if (!force && prev && val.length < prev.length) return;
+            clearTimeout(pcTimer);
+            pcTimer = setTimeout(function(){ lookupByPostcode(val, country, city, postcode); }, force ? 0 : 200);
+          }
+          postcode.addEventListener('focus',  function(){ lastPc = (postcode.value || '').trim(); });
+          postcode.addEventListener('input',  function(){ triggerPcLookup(false); });
+          postcode.addEventListener('change', function(){ triggerPcLookup(true);  });
+          postcode.addEventListener('blur',   function(){ triggerPcLookup(true);  });
+          if (country){
+            country.addEventListener('change', function(){
+              var val = (postcode.value || '').trim();
+              if (val.length >= 3) triggerPcLookup(true);
+            });
+          }
+        }
+      } // attachAddressAutocomplete
+
+      var initAutocomplete = function(){
+        attachAddressAutocomplete('');
+        attachAddressAutocomplete('delivery_');
+      };
+      initAutocomplete();
+      document.addEventListener('shopify:section:load',  initAutocomplete);
+      document.addEventListener('shopify:section:select', initAutocomplete);
+
+    } catch(e){
+      console.error('Address autocomplete init failed', e);
+    }
+  })();
+  
+  </script>
+
+{% render 'RegPro-submit-handler' %}
+
+
+ </section>
+
+{% schema %}
+{
+  "name": "Register Pro",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Title", "default": "Create an account" },
+    { "type": "text", "id": "subtitle", "label": "Subtitle", "default": "Access your customer area." },
+    { "type": "text", "id": "email_hint", "label": "Email hint", "default": "We never share your email." },
+    { "type": "color", "id": "bg", "label": "Background", "default": "#F7F8FA" },
+    { "type": "color", "id": "fg", "label": "Text color", "default": "#111111" },
+    { "type": "select", "id": "columns", "label": "Desktop columns", "default": "2", "options": [
+      { "value": "1", "label": "1 column" },
+      { "value": "2", "label": "2 columns" }
+    ]},
+    { "type": "range", "id": "field_gap", "label": "Field gap (px)", "min": 8, "max": 36, "step": 1, "default": 16 },
+    { "type": "range", "id": "input_radius", "label": "Input radius (px)", "min": 0, "max": 24, "step": 1, "default": 8 },
+    { "type": "range", "id": "input_height", "label": "Input min-height (px)", "min": 36, "max": 64, "step": 1, "default": 44 },
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "Send my request" },
+    { "type": "range", "id": "button_radius", "label": "Button radius (px)", "min": 0, "max": 100, "step": 1, "default": 24 },
+    { "type": "checkbox", "id": "btn_full", "label": "Button full width", "default": false },
+    { "type": "checkbox", "id": "btn_uppercase", "label": "Button uppercase", "default": false },
+    { "type": "color", "id": "btn_bg", "label": "Button background", "default": "#111111" },
+    { "type": "color", "id": "btn_fg", "label": "Button text color", "default": "#ffffff" },
+    { "type": "select", "id": "label_position", "label": "Label position", "default": "top", "options": [
+      { "value": "top", "label": "Top" },
+      { "value": "left", "label": "Left (desktop)" }
+    ]},
+    { "type": "range", "id": "label_width", "label": "Label width (left layout, %)", "min": 20, "max": 40, "step": 1, "default": 28 },
+    { "type": "text", "id": "delivery_title", "label": "Delivery section title", "default": "Delivery address (different)" },
+    { "type": "text", "id": "delivery_toggle_label", "label": "Toggle label", "default": "Use a different delivery address" },
+
+    { "type": "checkbox", "id": "enable_autocomplete", "label": "Enable address autocomplete", "default": false },
+    { "type": "select", "id": "ac_provider", "label": "Autocomplete provider", "default": "geoapify", "options": [
+      { "value": "geoapify", "label": "Geoapify" },
+      { "value": "google", "label": "Google Places" },
+      { "value": "mapbox", "label": "Mapbox" }
+    ]},
+    { "type": "text", "id": "ac_api_key", "label": "Provider API key", "default": "PASTE_KEY_HERE" },
+    { "type": "text", "id": "ac_countries", "label": "Country filter (ISO-2, CSV)", "default": "AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,IS,LI,NO,CH,GB" }
+  ],
+  "blocks": [
+    { "type": "heading", "name": "Heading", "settings": [
+      { "type": "text", "id": "text", "label": "Title", "default": "Company" },
+      { "type": "select", "id": "align", "label": "Alignment", "default": "left", "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ] }
+    ]},
+    { "type": "divider", "name": "Divider", "settings": [] },
+    { "type": "note", "name": "Note (text only)", "settings": [
+      { "type": "textarea", "id": "text", "label": "Text", "default": "Example message. You can edit this text block." },
+      { "type": "select", "id": "align", "label": "Alignment", "default": "left", "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ] }
+    ]},
+
+    { "type": "field_text", "name": "Text field", "settings": [
+      { "type": "text", "id": "label", "label": "Label", "default": "Field label" },
+      { "type": "text", "id": "key", "label": "Key (JSON)", "default": "field_key" },
+      { "type": "text", "id": "placeholder", "label": "Placeholder", "default": "Type here…" },
+      { "type": "select", "id": "width", "label": "Width", "default": "half", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "select", "id": "size", "label": "Input size", "default": "normal", "options": [
+        { "value": "normal", "label": "Normal" },
+        { "value": "sm", "label": "Small" }
+      ] },
+      { "type": "checkbox", "id": "required", "label": "Required", "default": false },
+      { "type": "select", "id": "mask", "label": "Mask", "default": "none", "options": [
+        { "value": "none", "label": "None" },
+        { "value": "iban", "label": "IBAN" },
+        { "value": "swift", "label": "SWIFT/BIC" },
+        { "value": "vat_che", "label": "Swiss VAT (CHE-xxx.xxx.xxx)" },
+        { "value": "phone", "label": "Phone" },
+        { "value": "int", "label": "Integer" }
+      ] },
+      { "type": "text", "id": "pattern", "label": "HTML pattern (optional)", "default": "^.*$" }
+    ]},
+    { "type": "field_email", "name": "Email field", "settings": [
+      { "type": "text", "id": "label", "label": "Label", "default": "Email" },
+      { "type": "text", "id": "key", "label": "Key (JSON)", "default": "email" },
+      { "type": "text", "id": "placeholder", "label": "Placeholder", "default": "name@example.com" },
+      { "type": "select", "id": "width", "label": "Width", "default": "half", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "checkbox", "id": "required", "label": "Required", "default": true }
+    ]},
+    { "type": "field_tel", "name": "Phone field", "settings": [
+      { "type": "text", "id": "label", "label": "Label", "default": "Telephone" },
+      { "type": "text", "id": "key", "label": "Key (JSON)", "default": "telephone" },
+      { "type": "text", "id": "placeholder", "label": "Placeholder", "default": "+41 ..." },
+      { "type": "select", "id": "width", "label": "Width", "default": "half", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "checkbox", "id": "required", "label": "Required", "default": false }
+    ]},
+    { "type": "field_number", "name": "Number field", "settings": [
+      { "type": "text", "id": "label", "label": "Label", "default": "Number" },
+      { "type": "text", "id": "key", "label": "Key (JSON)", "default": "number" },
+      { "type": "text", "id": "placeholder", "label": "Placeholder", "default": "0" },
+      { "type": "select", "id": "width", "label": "Width", "default": "half", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "checkbox", "id": "required", "label": "Required", "default": false }
+    ]},
+    { "type": "field_textarea", "name": "Textarea field", "settings": [
+      { "type": "text", "id": "label", "label": "Label", "default": "Your message" },
+      { "type": "text", "id": "key", "label": "Key (JSON)", "default": "message_key" },
+      { "type": "text", "id": "placeholder", "label": "Placeholder", "default": "Type your text here…" },
+      { "type": "select", "id": "width", "label": "Width", "default": "full", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "checkbox", "id": "required", "label": "Required", "default": false }
+    ]},
+    { "type": "field_select", "name": "Select field", "settings": [
+      { "type": "text", "id": "label", "label": "Label", "default": "Select" },
+      { "type": "text", "id": "key", "label": "Key (JSON)", "default": "select_key" },
+      { "type": "text", "id": "include_blank", "label": "Placeholder (first option)", "default": "Select..." },
+      { "type": "select", "id": "source", "label": "Options source", "default": "days", "options": [
+        { "value": "days", "label": "Days of week" },
+        { "value": "countries", "label": "Countries" }
+      ] },
+      { "type": "select", "id": "width", "label": "Width", "default": "half", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "select", "id": "size", "label": "Input size", "default": "normal", "options": [
+        { "value": "normal", "label": "Normal" },
+        { "value": "sm", "label": "Small" }
+      ] },
+      { "type": "checkbox", "id": "required", "label": "Required", "default": false }
+    ]},
+    { "type": "spacer", "name": "Spacer", "settings": [
+      { "type": "select", "id": "width", "label": "Width", "default": "full", "options": [
+        { "value": "half", "label": "1/2" },
+        { "value": "full", "label": "Full" }
+      ] },
+      { "type": "range", "id": "height", "label": "Height (px)", "min": 8, "max": 120, "step": 4, "default": 24 },
+      { "type": "checkbox", "id": "in_delivery", "label": "Place in Delivery accordion", "default": false }
+    ]}
+  ],
+  "max_blocks": 50,
+  "presets": [
+    {
+      "name": "Register Pro",
+      "category": "Customers",
+      "blocks": [
+        { "type": "field_text",    "settings": { "label": "Company Name",            "key": "company_name", "placeholder": "Acme SA",                             "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Company Registration n°", "key": "company_registration", "placeholder": "CHE-123.456.789",            "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "VAT n°",                  "key": "vat",           "placeholder": "CHE-123.456.789 TVA",                "width": "half", "size": "normal", "required": true,  "mask": "none","pattern": "^.*$"} },
+
+        { "type": "field_text",    "settings": { "label": "Street",                  "key": "street",        "placeholder": "Rue de la Gare",                     "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Number",                  "key": "number",        "placeholder": "12A",                                "width": "half", "size": "sm",     "required": true,  "mask": "none",   "pattern": "^.*$" } },
+
+        { "type": "field_text",    "settings": { "label": "Postcode",                "key": "postcode",      "placeholder": "1000",                               "width": "half", "size": "normal", "required": true,  "mask": "int",    "pattern": "^\\d{3,10}$" } },
+        { "type": "field_text",    "settings": { "label": "City",                    "key": "city",          "placeholder": "Lausanne",                           "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_select",  "settings": { "label": "Country",                 "key": "country",       "include_blank": "Select a country",                 "source": "countries", "width": "half", "size": "normal", "required": true } },
+
+        { "type": "field_text",    "settings": { "label": "Contact person (first and last name)", "key": "contact_person", "placeholder": "Jane Doe",         "width": "half", "size": "normal", "required": false,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_tel",     "settings": { "label": "Telephone",               "key": "telephone",     "placeholder": "+41 21 123 45 67",                   "width": "half",                   "required": false } },
+
+        { "type": "field_email",   "settings": { "label": "E-mail",                  "key": "email",         "placeholder": "name@example.com",                   "width": "half",                   "required": true } },
+        { "type": "field_email",   "settings": { "label": "E-mail finance",          "key": "finance_email", "placeholder": "finance@example.com",                "width": "half",                   "required": false } },
+
+        { "type": "field_text",    "settings": { "label": "IBAN",                    "key": "iban",          "placeholder": "CH93 0076 2011 6238 5295 7",         "width": "half", "size": "normal", "required": false, "mask": "iban",   "pattern": "^[A-Z]{2}[0-9A-Z]{2}(?: ?[0-9A-Z]{4}){2,7}$" } },
+        { "type": "field_text",    "settings": { "label": "BIC/SWIFT",               "key": "swift",         "placeholder": "ABCDEFGHXXX",                        "width": "half", "size": "normal", "required": false, "mask": "swift",  "pattern": "^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$" } },
+
+        { "type": "field_number",  "settings": { "label": "Weekly delivery frequency", "key": "weekly_delivery_frequency", "placeholder": "2",              "width": "half",                   "required": false } },
+        { "type": "field_select",  "settings": { "label": "Dispatch Day1",           "key": "dispatch_day1", "include_blank": "Select a day", "source": "days",   "width": "half", "size": "normal", "required": false } },
+        { "type": "field_select",  "settings": { "label": "Dispatch Day2",           "key": "dispatch_day2", "include_blank": "Select a day", "source": "days",   "width": "half", "size": "normal", "required": false } },
+
+        { "type": "field_text",    "settings": { "label": "Name",                    "key": "delivery_name",           "placeholder": "Acma SA",     "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Street",                  "key": "delivery_street",         "placeholder": "Rue du Port",          "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Number",                  "key": "delivery_number",         "placeholder": "5B",                   "width": "half", "size": "sm",     "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Postcode",                "key": "delivery_postcode",       "placeholder": "1000",                 "width": "half", "size": "normal", "required": false, "mask": "int",   "pattern": "^\\d{3,10}$" } },
+        { "type": "field_text",    "settings": { "label": "City",                    "key": "delivery_city",           "placeholder": "Lausanne",             "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_select",  "settings": { "label": "Country",                 "key": "delivery_country",        "include_blank": "Select a country",   "source": "countries", "width": "half", "size": "normal", "required": false } },
+        { "type": "field_text",    "settings": { "label": "Contact person (first and last name)", "key": "delivery_contact_person", "placeholder": "Dock contact", "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_tel",     "settings": { "label": "Telephone",               "key": "delivery_telephone",      "placeholder": "+41 21 000 00 00",     "width": "half",                   "required": false } },
+        { "type": "field_email",   "settings": { "label": "E-mail",                  "key": "delivery_email",          "placeholder": "dock@example.com",     "width": "half",                   "required": false } }
+      ]
+    }
+  ]
+}
+{% endschema %}
