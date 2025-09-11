@@ -7,13 +7,14 @@
   "scripts": {
     "start": "node server.js"
   },
+  "engines": { "node": ">=18" },
   "dependencies": {
     "express": "^4.18.2",
     "dotenv": "^16.3.1",
     "axios": "^1.6.7",
-    "node-fetch": "^2.6.7",          // reste en v2 pour require()
+    "node-fetch": "^2.6.7",
     "cors": "^2.8.5",
     "express-rate-limit": "^6.7.0",
-    "nodemailer": "^6.9.13"          // <-- AJOUT
+    "nodemailer": "^6.9.13"
   }
 }
