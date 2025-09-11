@@ -7,7 +7,7 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
 - Extra data serialized into customer[note] JSON.
 - Country & Day selectors via field_select (JS-populated).
 - Address autocomplete (EU) via optional setting (Geoapify by default).
-- Sends 2 emails via EmailJS (admin + user with CSV), then shows a Thank You screen (no Shopify account creation).
+- Sends payload to backend via fetch (SMTP service), then shows a Thank You screen (no Shopify account creation).
 {% endcomment %}
 
 <section class="regpro"
@@ -20,7 +20,8 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       {% endif %}
     </header>
 
-    {%- form 'create_customer', id: 'RegisterForm', novalidate: true, class: 'regpro__form' -%}
+    {%- form 'create_customer', id: 'RegisterForm', novalidate: true, class: 'regpro__form',
+    data-endpoint: section.settings.endpoint_url-%}
       {{ form.errors | default_errors }}
 
       <div class="regpro__grid" id="CompanyGrid">
@@ -175,9 +176,10 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
              alt="Thank you"
              width="160"
              height="120">
-        <h2 class="regpro__thanks-ttl">Thank you!</h2>
-        <p class="regpro__thanks-txt">Your request has been sent. We’ll get back to you shortly.</p>
-        <a class="regpro__btn regpro__btn--ghost" href="{{ routes.root_url }}">Back to home</a>
+        <h2 class="regpro__thanks-ttl">{{ section.settings.thanks_title }}</h2>
+        <p class="regpro__thanks-txt">{{ section.settings.thanks_text }}</p>
+        <a class="regpro__btn regpro__btn--ghost" href="{{ routes.root_url }}">{{ section.settings.thanks_back_label }}</a>
+
       </div>
     </div>
 
@@ -495,7 +497,7 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       if (actions.querySelector('.regpro__mandatory-hint')) return;
       var hint = document.createElement('div');
       hint.className = 'regpro__mandatory-hint';
-      hint.textContent = '*Mandatory fields';
+      hint.textContent = {{ section.settings.mandatory_hint | json }};
       actions.appendChild(hint);
     }
     addMandatoryHint();
@@ -972,6 +974,13 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
  </section>
 
 {% schema %}
+
+{ "type": "text", "id": "endpoint_url", "label": "Backend endpoint URL", "default": "https://<VOTRE-APP-RENDER>.onrender.com/regpro/submit" },
+{ "type": "text", "id": "mandatory_hint", "label": "Mandatory hint text", "default": "*Champs obligatoires" },
+{ "type": "text", "id": "thanks_title", "label": "Thanks title", "default": "Merci !" },
+{ "type": "text", "id": "thanks_text", "label": "Thanks text", "default": "Votre demande a été envoyée. Nous vous répondrons rapidement." },
+{ "type": "text", "id": "thanks_back_label", "label": "Thanks back button", "default": "Retour à l’accueil" }
+
 {
   "name": "Register Pro",
   "settings": [
