@@ -1,1 +1,144 @@
+<!-- 1) LOADER reCAPTCHA v3 -->
+<script id="regpro-recaptcha-v3">
+(function(){
+  // Même clé site pour vos deux domaines (vous pouvez en ajouter une seconde plus tard)
+  var SITE_KEYS = {
+    "www.ikyum.com":      "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw",
+    "www.xn--zy-gka.com": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw"
+  };
 
+  var loaded=false, loading=false, queue=[], cacheKey=null;
+  function host(){ try{ return location.hostname; }catch(_){ return ""; } }
+  function siteKey(){
+    if (!cacheKey) cacheKey = SITE_KEYS[host()] || Object.values(SITE_KEYS)[0] || "";
+    return cacheKey;
+  }
+  function ensureApi(){
+    return new Promise(function(resolve, reject){
+      if (loaded && window.grecaptcha) return resolve();
+      queue.push(resolve);
+      if (loading) return;
+
+      var key = siteKey();
+      if (!key) { reject(new Error("missing-sitekey")); return; }
+
+      loading = true;
+      var s=document.createElement("script");
+      s.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(key);
+      s.async = true; s.defer = true;
+      s.onload = function(){ loaded=true; loading=false; while(queue.length) (queue.shift())(); };
+      s.onerror = function(){ loading=false; reject(new Error("recaptcha-api-load-failed")); };
+      document.head.appendChild(s);
+    });
+  }
+  async function getToken(action){
+    await ensureApi();
+    var key = siteKey();
+    return new Promise(function(resolve, reject){
+      try{
+        grecaptcha.ready(function(){
+          grecaptcha.execute(key, { action: action || "submit" })
+            .then(resolve).catch(reject);
+        });
+      }catch(e){ reject(e); }
+    });
+  }
+  // API publique
+  window.getRecaptchaV3Token = async function(action){
+    try{ return await getToken(action); }
+    catch(_){ return await getToken(action); } // petit retry
+  };
+})();
+</script>
+
+<!-- 2) HANDLER (v3 uniquement) — Envoi vers votre backend SMTP -->
+<script>
+(function(){
+  if (window.__regpro_snippet_bound) return;
+  window.__regpro_snippet_bound = true;
+
+  var form = document.getElementById('RegisterForm');
+  if (!form) return;
+  if (form.dataset.regproSnippet === '1') return;
+  form.dataset.regproSnippet = '1';
+
+  // ⚠️ REMPLACEZ par l'URL de votre app Render
+  const ENDPOINT = "https://<VOTRE-APP-RENDER>.onrender.com/regpro/submit";
+
+  var submitBtn = form.querySelector('.regpro__btn');
+  var busy = false;
+
+  function collectFormData(){
+    var data = {};
+    form.querySelectorAll('[data-key]').forEach(function(el){
+      var k = (el.getAttribute('data-key')||'').trim(); if(!k) return;
+      var v = el.tagName==='SELECT'
+        ? ((el.options[el.selectedIndex] && el.options[el.selectedIndex].value) || '')
+        : (el.type==='checkbox' ? (el.checked ? (el.value||'1') : '') : (el.value||''));
+      data[k] = v;
+    });
+    var nativeEmail = document.getElementById('NativeEmail');
+    if (nativeEmail && !data.email) data.email = nativeEmail.value || '';
+    return data;
+  }
+  function disableUi(yes){ if (submitBtn) submitBtn.disabled = !!yes; }
+  function showThanks(){
+    (document.querySelector('.regpro__form')||form).hidden = true;
+    var t=document.getElementById('RegproThanks'); if(t) t.hidden=false;
+  }
+
+  async function handleSubmit(e){
+    try{ e && e.preventDefault && (e.preventDefault(), e.stopImmediatePropagation && e.stopImmediatePropagation(), e.stopPropagation && e.stopPropagation()); }catch(_){}
+    if (busy) return; busy = true; disableUi(true);
+
+    try{
+      // Honeypot
+      var hp = document.getElementById('HpWebsite');
+      var hpVal = (hp && hp.value) ? hp.value.trim() : "";
+
+      // Données
+      var data = collectFormData();
+
+      if (typeof window.getRecaptchaV3Token !== 'function') {
+        alert('reCAPTCHA v3 non initialisé — envoi impossible.');
+        disableUi(false); busy=false; return;
+      }
+
+      // Deux exécutions v3 (actions distinctes = meilleur signal)
+      var tokenAdmin = await window.getRecaptchaV3Token('regpro_admin');
+      var tokenUser  = data.email ? await window.getRecaptchaV3Token('regpro_user') : null;
+
+      // Envoi au serveur (Infomaniak SMTP derrière)
+      const resp = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data, token: tokenAdmin, token_user: tokenUser, hp: hpVal })
+      });
+
+      const json = await resp.json().catch(()=>({}));
+      if (!resp.ok || !json.ok) {
+        console.error('[regpro] server error', json);
+        throw new Error(json && (json.error || json.message) || ('HTTP '+resp.status));
+      }
+
+      try{ form.dataset.regproHandled='1'; }catch(_){}
+      showThanks();
+    }catch(err){
+      console.error('[regpro] submit error', err);
+      alert('Envoi impossible : ' + (err.message || 'Erreur inconnue'));
+      disableUi(false);
+    } finally {
+      busy=false;
+    }
+  }
+
+  form.addEventListener('submit', handleSubmit, { capture:true });
+  if (submitBtn){
+    submitBtn.addEventListener('click', function(ev){
+      if (!form.checkValidity()) return;
+      ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+      handleSubmit(ev);
+    }, { capture:true });
+  }
+})();
+</script>
