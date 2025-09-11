@@ -1,7 +1,7 @@
 {
   "name": "shopify-draft-server",
   "version": "1.0.0",
-  "licence": "UNLICENSED",
+  "license": "UNLICENSED",
   "description": "Serveur pour créer des draft orders Shopify",
   "main": "server.js",
   "scripts": {
@@ -11,8 +11,9 @@
     "express": "^4.18.2",
     "dotenv": "^16.3.1",
     "axios": "^1.6.7",
-    "node-fetch": "^2.6.7",
+    "node-fetch": "^2.6.7",          // reste en v2 pour require()
     "cors": "^2.8.5",
-    "express-rate-limit": "^6.7.0"
+    "express-rate-limit": "^6.7.0",
+    "nodemailer": "^6.9.13"          // <-- AJOUT
   }
 }
