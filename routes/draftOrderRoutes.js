@@ -2,7 +2,7 @@
 
 const express   = require('express');
 const cors      = require('cors');
-const fetch     = require('node-fetch');
+const fetch     = globalThis.fetch;
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
