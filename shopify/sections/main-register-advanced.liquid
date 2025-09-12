@@ -968,6 +968,32 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
   
   </script>
 
+{%- comment -%} === IKYUM-REGPRO: reCAPTCHA v3 client === {%- endcomment -%}
+{%- if section.settings.recaptcha_site_key and section.settings.recaptcha_site_key != blank -%}
+  <script src="https://www.google.com/recaptcha/api.js?render={{ section.settings.recaptcha_site_key }}"></script>
+  <input type="hidden" name="recaptcha_token" id="recaptcha_token" value="">
+  <script>
+    (function(){
+      var SITE_KEY = "{{ section.settings.recaptcha_site_key }}";
+      function refreshRecaptcha(){
+        if (!window.grecaptcha || !SITE_KEY) return;
+        grecaptcha.ready(function(){
+          grecaptcha.execute(SITE_KEY, {action: 'regpro_submit'}).then(function(token){
+            var fld = document.getElementById('recaptcha_token');
+            if (fld) fld.value = token || '';
+          });
+        });
+      }
+      document.addEventListener('DOMContentLoaded', refreshRecaptcha);
+      // Renouvelle le token périodiquement (validité courte côté Google)
+      setInterval(refreshRecaptcha, 90*1000);
+    })();
+  </script>
+{%- else -%}
+  <!-- reCAPTCHA désactivé: renseignez "reCAPTCHA site key" dans la section -->
+{%- endif -%}
+
+
 {% render 'RegPro-submit-handler' %}
 
 
