@@ -9,7 +9,7 @@
 const express       = require('express');
 const bodyParser    = require('body-parser');
 const cors          = require('cors');
-const fetch         = require('node-fetch');
+const fetch         = globalThis.fetch;
 const rateLimit     = require('express-rate-limit');
 const nodemailer    = require('nodemailer'); // <-- AJOUT
 require('dotenv').config();
