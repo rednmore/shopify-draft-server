@@ -1,7 +1,6 @@
 <!-- 1) LOADER reCAPTCHA v3 -->
 <script id="regpro-recaptcha-v3">
 (function(){
-  // Même clé site pour vos deux domaines (vous pouvez en ajouter une seconde plus tard)
   var SITE_KEYS = {
     "www.ikyum.com":      "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw",
     "www.xn--zy-gka.com": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw"
@@ -43,10 +42,9 @@
       }catch(e){ reject(e); }
     });
   }
-  // API publique
   window.getRecaptchaV3Token = async function(action){
     try{ return await getToken(action); }
-    catch(_){ return await getToken(action); } // petit retry
+    catch(_){ return await getToken(action); }
   };
 })();
 </script>
@@ -62,10 +60,9 @@
   if (form.dataset.regproSnippet === '1') return;
   form.dataset.regproSnippet = '1';
 
-  // Utilise l’endpoint configuré dans la section (data-endpoint) ou un fallback propre
   const ENDPOINT = (form.dataset.endpoint || "https://<VOTRE-APP-RENDER>.onrender.com/ikyum/regpro/submit").trim();
 
-  var submitBtn = form.querySelector('.regpro__btn');
+  var submitBtn = form.querySelector('.regpro__btn'); /* <-- garde une seule déclaration */
   var busy = false;
 
   function collectFormData(){
@@ -77,7 +74,6 @@
         : (el.type==='checkbox' ? (el.checked ? (el.value||'1') : '') : (el.value||''));
       data[k] = v;
     });
-    // Sauvegarde des champs natifs si renseignés
     var nativeEmail = document.getElementById('NativeEmail');
     if (nativeEmail && !data.email) data.email = nativeEmail.value || '';
     return data;
@@ -89,10 +85,9 @@
     var t=document.getElementById('RegproThanks'); if(t) t.hidden=false;
   }
 
-  // fetch avec timeout + retry simple
   async function postJsonWithRetry(url, payload, tries){
     const controller = new AbortController();
-    const timer = setTimeout(function(){ controller.abort(); }, 10000); // 10s
+    const timer = setTimeout(function(){ controller.abort(); }, 10000);
     try{
       const res = await fetch(url, {
         method: "POST",
@@ -121,11 +116,9 @@
     if (busy) return; busy = true; disableUi(true);
 
     try{
-      // Honeypot
       var hp = document.getElementById('HpWebsite');
       var hpVal = (hp && hp.value) ? hp.value.trim() : "";
 
-      // Données
       var data = collectFormData();
 
       if (typeof window.getRecaptchaV3Token !== 'function') {
@@ -133,16 +126,14 @@
         disableUi(false); busy=false; return;
       }
 
-      // Deux exécutions v3 (meilleur signal)
       var tokenAdmin = await window.getRecaptchaV3Token('regpro_admin');
       var tokenUser  = data.email ? await window.getRecaptchaV3Token('regpro_user') : null;
 
-      // Envoi JSON — le backend générera le CSV et l’attachera à l’email admin
-      const payload = { data, token_admin: tokenAdmin, token_user: tokenUser, hp: hpVal };
+      /* FIX 1: utiliser la clé attendue par le backend -> token */
+      const payload = { data, token: tokenAdmin, token_user: tokenUser, hp: hpVal };
 
-      const resp = await postJsonWithRetry(ENDPOINT, payload, 2);
+      await postJsonWithRetry(ENDPOINT, payload, 2);
 
-      // OK → Merci immédiat (le serveur a déjà renvoyé 202/200 et traite l’email en arrière-plan)
       showThanks();
     }catch(err){
       console.error('[regpro] submit error', err);
@@ -154,17 +145,13 @@
   }
 
   form.addEventListener('submit', handleSubmit, { capture:true });
-  var submitBtn = form.querySelector('.regpro__btn');
+
   if (submitBtn){
     submitBtn.addEventListener('click', function(ev){
-      if (!form.checkValidity()) return; // laisse le navigateur afficher la validation native
+      if (!form.checkValidity()) return;
       ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation();
       handleSubmit(ev);
     }, { capture:true });
   }
 })();
 </script>
-
-
-
-
