@@ -1031,7 +1031,7 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
     if (form.dataset.regproSnippet === '1') return;
     form.dataset.regproSnippet = '1';
 
-    const ENDPOINT = (form.dataset.endpoint || "https://<VOTRE-APP-RENDER>.onrender.com/ikyum/regpro/submit").trim();
+    const ENDPOINT = (form.dataset.endpoint || "https://shopify-draft-server.onrender.com/ikyum/regpro/submit").trim();
 
     var submitBtn = form.querySelector('.regpro__btn');
     var busy = false;
@@ -1132,7 +1132,7 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
 {
   "name": "Register Pro",
   "settings": [
-    { "type": "text", "id": "endpoint_url", "label": "Backend endpoint URL", "default": "https://<VOTRE-APP-RENDER>.onrender.com/ikyum/regpro/submit" },
+    { "type": "text", "id": "endpoint_url", "label": "Backend endpoint URL", "default": "https://shopify-draft-server.onrender.com/ikyum/regpro/submit" },
     { "type": "text", "id": "recaptcha_site_key", "label": "reCAPTCHA v3 – Site key", "default": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw" },
     { "type": "text", "id": "mandatory_hint", "label": "Mandatory hint text", "default": "*Champs obligatoires" },
     { "type": "text", "id": "thanks_title", "label": "Thanks title", "default": "Merci !" },
