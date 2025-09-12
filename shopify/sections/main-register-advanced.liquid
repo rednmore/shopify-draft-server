@@ -20,9 +20,8 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       {% endif %}
     </header>
 
-       <!-- Formulaire RegPro (custom, sans helper Shopify pour éviter hCaptcha) -->
+    <!-- Formulaire RegPro (custom, sans helper Shopify pour éviter hCaptcha) -->
     <form id="RegisterForm" novalidate class="regpro__form" data-endpoint="{{ section.settings.endpoint_url }}">
-      {# Ligne d’erreurs Shopify supprimée volontairement : {{ form.errors | default_errors }} #}
 
       <div class="regpro__grid" id="CompanyGrid">
         {% for block in section.blocks %}
@@ -167,8 +166,6 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
         <!-- Le texte "Mandatory fields" sera injecté juste dessous par JS -->
       </div>
     </form>
-
-
 
     <!-- Thank You panel (hidden by default) -->
     <div id="RegproThanks" class="regpro__thanks" hidden>
@@ -346,11 +343,14 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
     form.addEventListener('input', function(e){
       var el = e.target, mask = el.getAttribute('data-mask'); if (!mask) return;
       var prev = el.value, next = prev;
-      if (mask === 'iban'){ next = formatIBAN(prev); el.setAttribute('pattern'); }
+      if (mask === 'iban'){
+        next = formatIBAN(prev);
+        el.setAttribute('pattern','^[A-Z]{2}[0-9A-Z]{2}(?: ?[0-9A-Z]{4}){2,7}$');
+      }
       else if (mask === 'swift'){ next = formatSWIFT(prev); el.setAttribute('pattern','^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$'); }
       else if (mask === 'vat_che'){
-        next = formatVATCHE(prev);   // formatage visuel
-        el.removeAttribute('pattern'); // pas de regex bloquante
+        next = formatVATCHE(prev);
+        el.removeAttribute('pattern');
         try { el.setCustomValidity(''); } catch(_) {}
       }
       else if (mask === 'phone'){ next = formatPhone(prev); el.setAttribute('pattern','^[0-9 +().-]{6,}$'); }
@@ -967,36 +967,166 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       console.error('Address autocomplete init failed', e);
     }
   })();
-  
   </script>
 
-{%- comment -%} === IKYUM-REGPRO: reCAPTCHA v3 client === {%- endcomment -%}
-{%- if section.settings.recaptcha_site_key and section.settings.recaptcha_site_key != blank -%}
-<script src="https://www.google.com/recaptcha/api.js?render={{ section.settings.recaptcha_site_key }}" async defer></script>
-<script>
+  <!-- 1) LOADER reCAPTCHA v3 -->
+  <script id="regpro-recaptcha-v3">
   (function(){
-    var SITE_KEY = "{{ section.settings.recaptcha_site_key }}";
-    function refreshRecaptcha(){
-      if (!window.grecaptcha || !SITE_KEY) return;
-      grecaptcha.ready(function(){
-        grecaptcha.execute(SITE_KEY, {action: 'regpro_submit'}).then(function(token){
-          var fld = document.getElementById('recaptcha_token');
-          if (fld) fld.value = token || '';
-        });
+    var SITE_KEYS = {
+      "www.ikyum.com":      "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw",
+      "www.xn--zy-gka.com": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw"
+    };
+
+    var loaded=false, loading=false, queue=[], cacheKey=null;
+    function host(){ try{ return location.hostname; }catch(_){ return ""; } }
+    function siteKey(){
+      if (!cacheKey) cacheKey = SITE_KEYS[host()] || Object.values(SITE_KEYS)[0] || "";
+      return cacheKey;
+    }
+    function ensureApi(){
+      return new Promise(function(resolve, reject){
+        if (loaded && window.grecaptcha) return resolve();
+        queue.push(resolve);
+        if (loading) return;
+
+        var key = siteKey();
+        if (!key) { reject(new Error("missing-sitekey")); return; }
+
+        loading = true;
+        var s=document.createElement("script");
+        s.src = "https://www.google.com/recaptcha/api.js?render=" + encodeURIComponent(key);
+        s.async = true; s.defer = true;
+        s.onload = function(){ loaded=true; loading=false; while(queue.length) (queue.shift())(); };
+        s.onerror = function(){ loading=false; reject(new Error("recaptcha-api-load-failed")); };
+        document.head.appendChild(s);
       });
     }
-    document.addEventListener('DOMContentLoaded', refreshRecaptcha);
-    // Renouvelle le token périodiquement (validité courte côté Google)
-    setInterval(refreshRecaptcha, 90*1000);
+    async function getToken(action){
+      await ensureApi();
+      var key = siteKey();
+      return new Promise(function(resolve, reject){
+        try{
+          grecaptcha.ready(function(){
+            grecaptcha.execute(key, { action: action || "submit" })
+              .then(resolve).catch(reject);
+          });
+        }catch(e){ reject(e); }
+      });
+    }
+    window.getRecaptchaV3Token = async function(action){
+      try{ return await getToken(action); }
+      catch(_){ return await getToken(action); }
+    };
   })();
-</script>
-{%- else -%}
-  <!-- reCAPTCHA désactivé: renseignez "reCAPTCHA site key" dans la section -->
-{%- endif -%}
+  </script>
 
-{% render 'RegPro-submit-handler' %}
+  <!-- 2) HANDLER (v3) — Envoi JSON vers backend SMTP, CSV généré côté serveur -->
+  <script>
+  (function(){
+    if (window.__regpro_snippet_bound) return;
+    window.__regpro_snippet_bound = true;
 
- </section>
+    var form = document.getElementById('RegisterForm');
+    if (!form) return;
+    if (form.dataset.regproSnippet === '1') return;
+    form.dataset.regproSnippet = '1';
+
+    const ENDPOINT = (form.dataset.endpoint || "https://<VOTRE-APP-RENDER>.onrender.com/ikyum/regpro/submit").trim();
+
+    var submitBtn = form.querySelector('.regpro__btn');
+    var busy = false;
+
+    function collectFormData(){
+      var data = {};
+      form.querySelectorAll('[data-key]').forEach(function(el){
+        var k = (el.getAttribute('data-key')||'').trim(); if(!k) return;
+        var v = el.tagName==='SELECT'
+          ? ((el.options[el.selectedIndex] && el.options[el.selectedIndex].value) || '')
+          : (el.type==='checkbox' ? (el.checked ? (el.value||'1') : '') : (el.value||''));
+        data[k] = v;
+      });
+      var nativeEmail = document.getElementById('NativeEmail');
+      if (nativeEmail && !data.email) data.email = nativeEmail.value || '';
+      return data;
+    }
+
+    function disableUi(yes){ if (submitBtn) submitBtn.disabled = !!yes; }
+    function showThanks(){
+      (document.querySelector('.regpro__form')||form).hidden = true;
+      var t=document.getElementById('RegproThanks'); if(t) t.hidden=false;
+    }
+
+    async function postJsonWithRetry(url, payload, tries){
+      const controller = new AbortController();
+      const timer = setTimeout(function(){ controller.abort(); }, 10000);
+      try{
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-regpro-version": "v3-json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        let json = {};
+        try{ json = await res.json(); } catch(_){}
+        if (!res.ok || !json || json.ok !== true) throw new Error(json.error || ('HTTP '+res.status));
+        return json;
+      }catch(err){
+        clearTimeout(timer);
+        if (tries > 0) {
+          await new Promise(r => setTimeout(r, 400));
+          return postJsonWithRetry(url, payload, tries - 1);
+        }
+        throw err;
+      }
+    }
+
+    async function handleSubmit(e){
+      try{ e && e.preventDefault && (e.preventDefault(), e.stopImmediatePropagation && e.stopImmediatePropagation(), e.stopPropagation && e.stopPropagation()); }catch(_){}
+      if (busy) return; busy = true; disableUi(true);
+
+      try{
+        var hp = document.getElementById('HpWebsite');
+        var hpVal = (hp && hp.value) ? hp.value.trim() : "";
+
+        var data = collectFormData();
+
+        if (typeof window.getRecaptchaV3Token !== 'function') {
+          alert('reCAPTCHA v3 non initialisé — envoi impossible.');
+          disableUi(false); busy=false; return;
+        }
+
+        var tokenAdmin = await window.getRecaptchaV3Token('regpro_admin');
+        var tokenUser  = data.email ? await window.getRecaptchaV3Token('regpro_user') : null;
+
+        const payload = { data, token_admin: tokenAdmin, token_user: tokenUser, hp: hpVal };
+
+        await postJsonWithRetry(ENDPOINT, payload, 2);
+
+        showThanks();
+      }catch(err){
+        console.error('[regpro] submit error', err);
+        alert('Envoi impossible : ' + (err.message || 'Erreur inconnue'));
+        disableUi(false);
+      } finally {
+        busy=false;
+      }
+    }
+
+    form.addEventListener('submit', handleSubmit, { capture:true });
+    submitBtn = submitBtn || form.querySelector('.regpro__btn');
+    if (submitBtn){
+      submitBtn.addEventListener('click', function(ev){
+        if (!form.checkValidity()) return;
+        ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation();
+        handleSubmit(ev);
+      }, { capture:true });
+    }
+  })();
+  </script>
+
+</section>
 
 {% schema %}
 {
@@ -1159,39 +1289,39 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       "name": "Register Pro",
       "category": "Customers",
       "blocks": [
-        { "type": "field_text", "settings": { "label": "Company Name", "key": "company_name", "placeholder": "Acme SA", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_text", "settings": { "label": "Company Registration n°", "key": "company_registration", "placeholder": "CHE-123.456.789", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_text", "settings": { "label": "VAT n°", "key": "vat", "placeholder": "CHE-123.456.789 TVA", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Company Name",            "key": "company_name", "placeholder": "Acme SA",                             "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Company Registration n°", "key": "company_registration", "placeholder": "CHE-123.456.789",            "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "VAT n°",                  "key": "vat",           "placeholder": "CHE-123.456.789 TVA",                "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$"} },
 
-        { "type": "field_text", "settings": { "label": "Street", "key": "street", "placeholder": "Rue de la Gare", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_text", "settings": { "label": "Number", "key": "number", "placeholder": "12A", "width": "half", "size": "sm", "required": true, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Street",                  "key": "street",        "placeholder": "Rue de la Gare",                     "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Number",                  "key": "number",        "placeholder": "12A",                                "width": "half", "size": "sm",     "required": true,  "mask": "none",   "pattern": "^.*$" } },
 
-        { "type": "field_text", "settings": { "label": "Postcode", "key": "postcode", "placeholder": "1000", "width": "half", "size": "normal", "required": true, "mask": "int", "pattern": "^\\d{3,10}$" } },
-        { "type": "field_text", "settings": { "label": "City", "key": "city", "placeholder": "Lausanne", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_select", "settings": { "label": "Country", "key": "country", "include_blank": "Select a country", "source": "countries", "width": "half", "size": "normal", "required": true } },
+        { "type": "field_text",    "settings": { "label": "Postcode",                "key": "postcode",      "placeholder": "1000",                               "width": "half", "size": "normal", "required": true,  "mask": "int",    "pattern": "^\\d{3,10}$" } },
+        { "type": "field_text",    "settings": { "label": "City",                    "key": "city",          "placeholder": "Lausanne",                           "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_select",  "settings": { "label": "Country",                 "key": "country",       "include_blank": "Select a country",                 "source": "countries", "width": "half", "size": "normal", "required": true } },
 
-        { "type": "field_text", "settings": { "label": "Contact person (first and last name)", "key": "contact_person", "placeholder": "Jane Doe", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_tel", "settings": { "label": "Telephone", "key": "telephone", "placeholder": "+41 21 123 45 67", "width": "half", "required": false } },
+        { "type": "field_text",    "settings": { "label": "Contact person (first and last name)", "key": "contact_person", "placeholder": "Jane Doe",         "width": "half", "size": "normal", "required": false,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_tel",     "settings": { "label": "Telephone",               "key": "telephone",     "placeholder": "+41 21 123 45 67",                   "width": "half",                   "required": false } },
 
-        { "type": "field_email", "settings": { "label": "E-mail", "key": "email", "placeholder": "name@example.com", "width": "half", "required": true } },
-        { "type": "field_email", "settings": { "label": "E-mail finance", "key": "finance_email", "placeholder": "finance@example.com", "width": "half", "required": false } },
+        { "type": "field_email",   "settings": { "label": "E-mail",                  "key": "email",         "placeholder": "name@example.com",                   "width": "half",                   "required": true } },
+        { "type": "field_email",   "settings": { "label": "E-mail finance",          "key": "finance_email", "placeholder": "finance@example.com",                "width": "half",                   "required": false } },
 
-        { "type": "field_text", "settings": { "label": "IBAN", "key": "iban", "placeholder": "CH93 0076 2011 6238 5295 7", "width": "half", "size": "normal", "required": false, "mask": "iban", "pattern": "^[A-Z]{2}[0-9A-Z]{2}(?: ?[0-9A-Z]{4}){2,7}$" } },
-        { "type": "field_text", "settings": { "label": "BIC/SWIFT", "key": "swift", "placeholder": "ABCDEFGHXXX", "width": "half", "size": "normal", "required": false, "mask": "swift", "pattern": "^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$" } },
+        { "type": "field_text",    "settings": { "label": "IBAN",                    "key": "iban",          "placeholder": "CH93 0076 2011 6238 5295 7",         "width": "half", "size": "normal", "required": false, "mask": "iban",   "pattern": "^[A-Z]{2}[0-9A-Z]{2}(?: ?[0-9A-Z]{4}){2,7}$" } },
+        { "type": "field_text",    "settings": { "label": "BIC/SWIFT",               "key": "swift",         "placeholder": "ABCDEFGHXXX",                        "width": "half", "size": "normal", "required": false, "mask": "swift",  "pattern": "^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$" } },
 
-        { "type": "field_number", "settings": { "label": "Weekly delivery frequency", "key": "weekly_delivery_frequency", "placeholder": "2", "width": "half", "required": false } },
-        { "type": "field_select", "settings": { "label": "Dispatch Day1", "key": "dispatch_day1", "include_blank": "Select a day", "source": "days", "width": "half", "size": "normal", "required": false } },
-        { "type": "field_select", "settings": { "label": "Dispatch Day2", "key": "dispatch_day2", "include_blank": "Select a day", "source": "days", "width": "half", "size": "normal", "required": false } },
+        { "type": "field_number",  "settings": { "label": "Weekly delivery frequency", "key": "weekly_delivery_frequency", "placeholder": "2",              "width": "half",                   "required": false } },
+        { "type": "field_select",  "settings": { "label": "Dispatch Day1",           "key": "dispatch_day1", "include_blank": "Select a day", "source": "days",   "width": "half", "size": "normal", "required": false } },
+        { "type": "field_select",  "settings": { "label": "Dispatch Day2",           "key": "dispatch_day2", "include_blank": "Select a day", "source": "days",   "width": "half", "size": "normal", "required": false } },
 
-        { "type": "field_text", "settings": { "label": "Name", "key": "delivery_name", "placeholder": "Acma SA", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_text", "settings": { "label": "Street", "key": "delivery_street", "placeholder": "Rue du Port", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_text", "settings": { "label": "Number", "key": "delivery_number", "placeholder": "5B", "width": "half", "size": "sm", "required": false, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_text", "settings": { "label": "Postcode", "key": "delivery_postcode", "placeholder": "1000", "width": "half", "size": "normal", "required": false, "mask": "int", "pattern": "^\\d{3,10}$" } },
-        { "type": "field_text", "settings": { "label": "City", "key": "delivery_city", "placeholder": "Lausanne", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_select", "settings": { "label": "Country", "key": "delivery_country", "include_blank": "Select a country", "source": "countries", "width": "half", "size": "normal", "required": false } },
-        { "type": "field_text", "settings": { "label": "Contact person (first and last name)", "key": "delivery_contact_person", "placeholder": "Dock contact", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
-        { "type": "field_tel", "settings": { "label": "Telephone", "key": "delivery_telephone", "placeholder": "+41 21 000 00 00", "width": "half", "required": false } },
-        { "type": "field_email", "settings": { "label": "E-mail", "key": "delivery_email", "placeholder": "dock@example.com", "width": "half", "required": false } }
+        { "type": "field_text",    "settings": { "label": "Name",                    "key": "delivery_name",           "placeholder": "Acma SA",     "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Street",                  "key": "delivery_street",         "placeholder": "Rue du Port",          "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Number",                  "key": "delivery_number",         "placeholder": "5B",                   "width": "half", "size": "sm",     "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_text",    "settings": { "label": "Postcode",                "key": "delivery_postcode",       "placeholder": "1000",                 "width": "half", "size": "normal", "required": false, "mask": "int",   "pattern": "^\\d{3,10}$" } },
+        { "type": "field_text",    "settings": { "label": "City",                    "key": "delivery_city",           "placeholder": "Lausanne",             "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_select",  "settings": { "label": "Country",                 "key": "delivery_country",        "include_blank": "Select a country",   "source": "countries", "width": "half", "size": "normal", "required": false } },
+        { "type": "field_text",    "settings": { "label": "Contact person (first and last name)", "key": "delivery_contact_person", "placeholder": "Dock contact", "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
+        { "type": "field_tel",     "settings": { "label": "Telephone",               "key": "delivery_telephone",      "placeholder": "+41 21 000 00 00",     "width": "half",                   "required": false } },
+        { "type": "field_email",   "settings": { "label": "E-mail",                  "key": "delivery_email",          "placeholder": "dock@example.com",     "width": "half",                   "required": false } }
       ]
     }
   ]
