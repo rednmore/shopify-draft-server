@@ -1,0 +1,309 @@
+{% assign ai_gen_id = section.id %}
+
+{% style %}
+  .ai-lens-coatings-{{ ai_gen_id }} {
+    padding: {{ section.settings.section_padding }}px 20px;
+    background-color: {{ section.settings.background_color }};
+    color: {{ section.settings.text_color }};
+  }
+
+  .ai-lens-coatings-container-{{ ai_gen_id }} {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .ai-lens-coatings-header-{{ ai_gen_id }} {
+    text-align: center;
+    margin-bottom: {{ section.settings.header_spacing }}px;
+  }
+
+  .ai-lens-coatings-title-{{ ai_gen_id }} {
+    font-size: {{ section.settings.title_size }}px;
+    color: {{ section.settings.title_color }};
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+
+  .ai-lens-coatings-subtitle-{{ ai_gen_id }} {
+    font-size: {{ section.settings.subtitle_size }}px;
+    color: {{ section.settings.subtitle_color }};
+    margin: 0;
+    opacity: 0.8;
+  }
+
+  .ai-lens-coatings-grid-{{ ai_gen_id }} {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: {{ section.settings.card_spacing }}px;
+    margin-top: {{ section.settings.grid_spacing }}px;
+  }
+
+  .ai-lens-coating-card-{{ ai_gen_id }} {
+    background-color: {{ section.settings.card_background }};
+    border-radius: {{ section.settings.card_border_radius }}px;
+    padding: {{ section.settings.card_padding }}px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    transition: transform .3s ease, box-shadow .3s ease;
+    border: 1px solid {{ section.settings.card_border_color }};
+  }
+  .ai-lens-coating-card-{{ ai_gen_id }}:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.15);
+  }
+
+  /* HERO (image de tête) : pleine largeur, hauteur ajustable */
+  .ai-lens-coating-icon-{{ ai_gen_id }} {
+    width: 100%;
+    height: {{ section.settings.hero_height }}px;
+    margin: 0 0 16px;
+    display: block;
+    background-color: {{ section.settings.icon_background }};
+    border-radius: {{ section.settings.card_border_radius }}px;
+    overflow: hidden;
+  }
+  .ai-lens-coating-icon-{{ ai_gen_id }} img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  /* Placeholder centré si pas d’image fournie */
+  .ai-lens-coating-icon-placeholder-{{ ai_gen_id }} {
+    width: 100%;
+    height: 100%;
+    display:flex; align-items:center; justify-content:center;
+    background-color: {{ section.settings.icon_background }};
+  }
+  .ai-lens-coating-icon-placeholder-{{ ai_gen_id }} svg {
+    width: {{ section.settings.icon_size }}px;
+    height: auto;
+    color: {{ section.settings.icon_color }};
+    opacity: .7;
+  }
+
+  .ai-lens-coating-name-{{ ai_gen_id }} {
+    font-size: {{ section.settings.coating_name_size }}px;
+    font-weight: 700;
+    color: {{ section.settings.coating_name_color }};
+    margin: 8px 0 12px;
+    text-align: center;
+  }
+  .ai-lens-coating-tagline-{{ ai_gen_id }} {
+    font-size: {{ section.settings.tagline_size }}px;
+    color: {{ section.settings.tagline_color }};
+    margin: 0 0 16px;
+    text-align: center;
+    font-weight: 500;
+  }
+  .ai-lens-coating-description-{{ ai_gen_id }} {
+    font-size: {{ section.settings.description_size }}px;
+    color: {{ section.settings.description_color }};
+    line-height: 1.6;
+    margin: 0;
+    text-align: center;
+  }
+
+  @media (max-width: 768px) {
+    .ai-lens-coatings-grid-{{ ai_gen_id }} {
+      grid-template-columns: 1fr;
+      gap: {{ section.settings.card_spacing | times: 0.75 }}px;
+    }
+    .ai-lens-coating-card-{{ ai_gen_id }} {
+      padding: {{ section.settings.card_padding | times: 0.8 }}px;
+    }
+    .ai-lens-coatings-title-{{ ai_gen_id }} {
+      font-size: {{ section.settings.title_size | times: 0.85 }}px;
+    }
+  }
+  @media (max-width: 480px) {
+    .ai-lens-coatings-{{ ai_gen_id }} {
+      padding: {{ section.settings.section_padding | times: 0.7 }}px 16px;
+    }
+  }
+{% endstyle %}
+
+<div class="ai-lens-coatings-{{ ai_gen_id }}">
+  <div class="ai-lens-coatings-container-{{ ai_gen_id }}">
+    {% if section.settings.show_header %}
+      <div class="ai-lens-coatings-header-{{ ai_gen_id }}">
+        {% if section.settings.title != blank %}
+          <h2 class="ai-lens-coatings-title-{{ ai_gen_id }}">{{ section.settings.title }}</h2>
+        {% endif %}
+        {% if section.settings.subtitle != blank %}
+          <p class="ai-lens-coatings-subtitle-{{ ai_gen_id }}">{{ section.settings.subtitle }}</p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="ai-lens-coatings-grid-{{ ai_gen_id }}">
+      <!-- Carte 1 -->
+      <div class="ai-lens-coating-card-{{ ai_gen_id }}">
+        <div class="ai-lens-coating-icon-{{ ai_gen_id }}">
+          {% if section.settings.coating_1_image %}
+            <img src="{{ section.settings.coating_1_image | image_url: width: 1400 }}" alt="{{ section.settings.coating_1_name | default: 'Coating' | escape }}" loading="lazy">
+          {% else %}
+            <div class="ai-lens-coating-icon-placeholder-{{ ai_gen_id }}">{{ 'image' | placeholder_svg_tag }}</div>
+          {% endif %}
+        </div>
+        <h3 class="ai-lens-coating-name-{{ ai_gen_id }}">{{ section.settings.coating_1_name }}</h3>
+        <p class="ai-lens-coating-tagline-{{ ai_gen_id }}">{{ section.settings.coating_1_tagline }}</p>
+        <p class="ai-lens-coating-description-{{ ai_gen_id }}">{{ section.settings.coating_1_description }}</p>
+      </div>
+
+      <!-- Carte 2 -->
+      <div class="ai-lens-coating-card-{{ ai_gen_id }}">
+        <div class="ai-lens-coating-icon-{{ ai_gen_id }}">
+          {% if section.settings.coating_2_image %}
+            <img src="{{ section.settings.coating_2_image | image_url: width: 1400 }}" alt="{{ section.settings.coating_2_name | default: 'Coating' | escape }}" loading="lazy">
+          {% else %}
+            <div class="ai-lens-coating-icon-placeholder-{{ ai_gen_id }}">{{ 'image' | placeholder_svg_tag }}</div>
+          {% endif %}
+        </div>
+        <h3 class="ai-lens-coating-name-{{ ai_gen_id }}">{{ section.settings.coating_2_name }}</h3>
+        <p class="ai-lens-coating-tagline-{{ ai_gen_id }}">{{ section.settings.coating_2_tagline }}</p>
+        <p class="ai-lens-coating-description-{{ ai_gen_id }}">{{ section.settings.coating_2_description }}</p>
+      </div>
+
+      <!-- Carte 3 -->
+      <div class="ai-lens-coating-card-{{ ai_gen_id }}">
+        <div class="ai-lens-coating-icon-{{ ai_gen_id }}">
+          {% if section.settings.coating_3_image %}
+            <img src="{{ section.settings.coating_3_image | image_url: width: 1400 }}" alt="{{ section.settings.coating_3_name | default: 'Coating' | escape }}" loading="lazy">
+          {% else %}
+            <div class="ai-lens-coating-icon-placeholder-{{ ai_gen_id }}">{{ 'image' | placeholder_svg_tag }}</div>
+          {% endif %}
+        </div>
+        <h3 class="ai-lens-coating-name-{{ ai_gen_id }}">{{ section.settings.coating_3_name }}</h3>
+        <p class="ai-lens-coating-tagline-{{ ai_gen_id }}">{{ section.settings.coating_3_tagline }}</p>
+        <p class="ai-lens-coating-description-{{ ai_gen_id }}">{{ section.settings.coating_3_description }}</p>
+      </div>
+
+      <!-- Carte 4 -->
+      <div class="ai-lens-coating-card-{{ ai_gen_id }}">
+        <div class="ai-lens-coating-icon-{{ ai_gen_id }}">
+          {% if section.settings.coating_4_image %}
+            <img src="{{ section.settings.coating_4_image | image_url: width: 1400 }}" alt="{{ section.settings.coating_4_name | default: 'Coating' | escape }}" loading="lazy">
+          {% else %}
+            <div class="ai-lens-coating-icon-placeholder-{{ ai_gen_id }}">{{ 'image' | placeholder_svg_tag }}</div>
+          {% endif %}
+        </div>
+        <h3 class="ai-lens-coating-name-{{ ai_gen_id }}">{{ section.settings.coating_4_name }}</h3>
+        <p class="ai-lens-coating-tagline-{{ ai_gen_id }}">{{ section.settings.coating_4_tagline }}</p>
+        <p class="ai-lens-coating-description-{{ ai_gen_id }}">{{ section.settings.coating_4_description }}</p>
+      </div>
+
+      <!-- Carte 5 -->
+      <div class="ai-lens-coating-card-{{ ai_gen_id }}">
+        <div class="ai-lens-coating-icon-{{ ai_gen_id }}">
+          {% if section.settings.coating_5_image %}
+            <img src="{{ section.settings.coating_5_image | image_url: width: 1400 }}" alt="{{ section.settings.coating_5_name | default: 'Coating' | escape }}" loading="lazy">
+          {% else %}
+            <div class="ai-lens-coating-icon-placeholder-{{ ai_gen_id }}">{{ 'image' | placeholder_svg_tag }}</div>
+          {% endif %}
+        </div>
+        <h3 class="ai-lens-coating-name-{{ ai_gen_id }}">{{ section.settings.coating_5_name }}</h3>
+        <p class="ai-lens-coating-tagline-{{ ai_gen_id }}">{{ section.settings.coating_5_tagline }}</p>
+        <p class="ai-lens-coating-description-{{ ai_gen_id }}">{{ section.settings.coating_5_description }}</p>
+      </div>
+
+      <!-- Carte 6 -->
+      <div class="ai-lens-coating-card-{{ ai_gen_id }}">
+        <div class="ai-lens-coating-icon-{{ ai_gen_id }}">
+          {% if section.settings.coating_6_image %}
+            <img src="{{ section.settings.coating_6_image | image_url: width: 1400 }}" alt="{{ section.settings.coating_6_name | default: 'Coating' | escape }}" loading="lazy">
+          {% else %}
+            <div class="ai-lens-coating-icon-placeholder-{{ ai_gen_id }}">{{ 'image' | placeholder_svg_tag }}</div>
+          {% endif %}
+        </div>
+        <h3 class="ai-lens-coating-name-{{ ai_gen_id }}">{{ section.settings.coating_6_name }}</h3>
+        <p class="ai-lens-coating-tagline-{{ ai_gen_id }}">{{ section.settings.coating_6_tagline }}</p>
+        <p class="ai-lens-coating-description-{{ ai_gen_id }}">{{ section.settings.coating_6_description }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "IKYUM lens coatings",
+  "settings": [
+    { "type": "header", "content": "Section header" },
+    { "type": "checkbox", "id": "show_header", "label": "Show header", "default": true },
+    { "type": "text", "id": "title", "label": "Title", "default": "Premium Lens Coatings" },
+    { "type": "text", "id": "subtitle", "label": "Subtitle", "default": "Advanced optical technologies for superior vision performance" },
+
+    { "type": "header", "content": "Coating 1" },
+    { "type": "image_picker", "id": "coating_1_image", "label": "Image" },
+    { "type": "text", "id": "coating_1_name", "label": "Name", "default": "Clarity" },
+    { "type": "text", "id": "coating_1_tagline", "label": "Tagline", "default": "Essential protection for everyday clarity and durability." },
+    { "type": "textarea", "id": "coating_1_description", "label": "Description", "default": "Our foundational anti-reflective coating reduces glare and enhances light transmission. Features scratch-resistant properties and easy-clean surface treatment for optimal lens performance." },
+
+    { "type": "header", "content": "Coating 2" },
+    { "type": "image_picker", "id": "coating_2_image", "label": "Image" },
+    { "type": "text", "id": "coating_2_name", "label": "Name", "default": "Clarity B-UV" },
+    { "type": "text", "id": "coating_2_tagline", "label": "Tagline", "default": "Advanced UV protection with blue light filtering technology." },
+    { "type": "textarea", "id": "coating_2_description", "label": "Description", "default": "Combines comprehensive UV blocking with selective blue light filtration. Reduces digital eye strain while maintaining natural color perception for comfortable all-day wear." },
+
+    { "type": "header", "content": "Coating 3" },
+    { "type": "image_picker", "id": "coating_3_image", "label": "Image" },
+    { "type": "text", "id": "coating_3_name", "label": "Name", "default": "Clarity Achromatic" },
+    { "type": "text", "id": "coating_3_tagline", "label": "Tagline", "default": "Precision optics for true-to-life color reproduction." },
+    { "type": "textarea", "id": "coating_3_description", "label": "Description", "default": "Eliminates chromatic aberration and color distortion through advanced multi-layer technology." },
+
+    { "type": "header", "content": "Coating 4" },
+    { "type": "image_picker", "id": "coating_4_image", "label": "Image" },
+    { "type": "text", "id": "coating_4_name", "label": "Name", "default": "Clarity Blue Pro" },
+    { "type": "text", "id": "coating_4_tagline", "label": "Tagline", "default": "Professional-grade digital screen protection." },
+    { "type": "textarea", "id": "coating_4_description", "label": "Description", "default": "Blocks harmful blue light wavelengths while preserving essential blue light for circadian rhythm regulation." },
+
+    { "type": "header", "content": "Coating 5" },
+    { "type": "image_picker", "id": "coating_5_image", "label": "Image" },
+    { "type": "text", "id": "coating_5_name", "label": "Name", "default": "Clarity UltraSlick" },
+    { "type": "text", "id": "coating_5_tagline", "label": "Tagline", "default": "Hydrophobic technology for effortless maintenance." },
+    { "type": "textarea", "id": "coating_5_description", "label": "Description", "default": "Oleophobic & hydrophobic properties that repel water, oil, and fingerprints." },
+
+    { "type": "header", "content": "Coating 6" },
+    { "type": "image_picker", "id": "coating_6_image", "label": "Image" },
+    { "type": "text", "id": "coating_6_name", "label": "Name", "default": "Clarity Mirror Coating" },
+    { "type": "text", "id": "coating_6_tagline", "label": "Tagline", "default": "Reflective protection with enhanced visual comfort." },
+    { "type": "textarea", "id": "coating_6_description", "label": "Description", "default": "Combines mirror technology with anti-reflective properties for optimal light management." },
+
+    { "type": "header", "content": "Layout" },
+    { "type": "range", "id": "section_padding", "min": 20, "max": 100, "step": 5, "unit": "px", "label": "Section padding", "default": 60 },
+    { "type": "range", "id": "header_spacing", "min": 20, "max": 80, "step": 5, "unit": "px", "label": "Header spacing", "default": 40 },
+    { "type": "range", "id": "grid_spacing", "min": 20, "max": 80, "step": 5, "unit": "px", "label": "Grid spacing", "default": 40 },
+    { "type": "range", "id": "card_spacing", "min": 15, "max": 50, "step": 5, "unit": "px", "label": "Card spacing", "default": 30 },
+    { "type": "range", "id": "card_padding", "min": 20, "max": 50, "step": 5, "unit": "px", "label": "Card padding", "default": 30 },
+    { "type": "range", "id": "card_border_radius", "min": 0, "max": 20, "step": 2, "unit": "px", "label": "Card border radius", "default": 12 },
+
+    { "type": "header", "content": "Hero image (top of card)" },
+    { "type": "range", "id": "hero_height", "min": 120, "max": 420, "step": 10, "unit": "px", "label": "Hero image height", "default": 260 },
+
+    { "type": "header", "content": "Colors" },
+    { "type": "color", "id": "background_color", "label": "Background", "default": "#ffffff" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#1c1c1c" },
+    { "type": "color", "id": "card_background", "label": "Card background", "default": "#ffffff" },
+    { "type": "color", "id": "card_border_color", "label": "Card border", "default": "#e5e5e5" },
+    { "type": "color", "id": "icon_background", "label": "Hero background (when no image)", "default": "#f0f0f0" },
+    { "type": "color", "id": "icon_color", "label": "Placeholder icon color", "default": "#1c1c1c" },
+
+    { "type": "header", "content": "Typography" },
+    { "type": "range", "id": "title_size", "min": 20, "max": 48, "step": 2, "unit": "px", "label": "Title size", "default": 32 },
+    { "type": "color", "id": "title_color", "label": "Title color", "default": "#1c1c1c" },
+    { "type": "range", "id": "subtitle_size", "min": 14, "max": 24, "step": 1, "unit": "px", "label": "Subtitle size", "default": 18 },
+    { "type": "color", "id": "subtitle_color", "label": "Subtitle color", "default": "#666666" },
+    { "type": "range", "id": "coating_name_size", "min": 16, "max": 28, "step": 1, "unit": "px", "label": "Coating name size", "default": 20 },
+    { "type": "color", "id": "coating_name_color", "label": "Coating name color", "default": "#1c1c1c" },
+    { "type": "range", "id": "tagline_size", "min": 12, "max": 18, "step": 1, "unit": "px", "label": "Tagline size", "default": 14 },
+    { "type": "color", "id": "tagline_color", "label": "Tagline color", "default": "#0066cc" },
+    { "type": "range", "id": "description_size", "min": 12, "max": 18, "step": 1, "unit": "px", "label": "Description size", "default": 14 },
+    { "type": "color", "id": "description_color", "label": "Description color", "default": "#666666" },
+
+    /* garde pour la taille du placeholder svg */
+    { "type": "range", "id": "icon_size", "min": 40, "max": 80, "step": 5, "unit": "px", "label": "Placeholder icon size", "default": 60 }
+  ],
+  "presets": [
+    { "name": "IKYUM lens coatings" }
+  ]
+}
+{% endschema %}
