@@ -39,6 +39,8 @@ app.set('trust proxy', 1); // Faire confiance au proxy pour X-Forwarded-
 // =========================================
 const ALLOWED_ORIGINS = [
   'https://www.ikyum.com',            // <-- AJOUT : IKYUM
+  'https://www.admin.shopify.com',     // <-- AJOUT : IKYUM - dev mod
+  'https://www.ikyum.myshopify.com',     // <-- AJOUT : IKYUM - dev mode
   'https://www.xn--zy-gka.com',
   'https://www.zyö.com',
   'http://localhost:3000',
