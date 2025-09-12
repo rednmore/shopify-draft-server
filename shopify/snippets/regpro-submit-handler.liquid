@@ -51,7 +51,7 @@
 })();
 </script>
 
-<!-- 2) HANDLER (v3 uniquement) — Envoi vers votre backend SMTP -->
+<!-- 2) HANDLER (v3) — Envoi JSON vers backend SMTP, CSV généré côté serveur -->
 <script>
 (function(){
   if (window.__regpro_snippet_bound) return;
@@ -62,8 +62,8 @@
   if (form.dataset.regproSnippet === '1') return;
   form.dataset.regproSnippet = '1';
 
-  // ⚠️ REMPLACEZ par l'URL de votre app Render
-  const ENDPOINT = "https://<VOTRE-APP-RENDER>.onrender.com/regpro/submit";
+  // Utilise l’endpoint configuré dans la section (data-endpoint) ou un fallback propre
+  const ENDPOINT = (form.dataset.endpoint || "https://<VOTRE-APP-RENDER>.onrender.com/ikyum/regpro/submit").trim();
 
   var submitBtn = form.querySelector('.regpro__btn');
   var busy = false;
@@ -77,14 +77,43 @@
         : (el.type==='checkbox' ? (el.checked ? (el.value||'1') : '') : (el.value||''));
       data[k] = v;
     });
+    // Sauvegarde des champs natifs si renseignés
     var nativeEmail = document.getElementById('NativeEmail');
     if (nativeEmail && !data.email) data.email = nativeEmail.value || '';
     return data;
   }
+
   function disableUi(yes){ if (submitBtn) submitBtn.disabled = !!yes; }
   function showThanks(){
     (document.querySelector('.regpro__form')||form).hidden = true;
     var t=document.getElementById('RegproThanks'); if(t) t.hidden=false;
+  }
+
+  // fetch avec timeout + retry simple
+  async function postJsonWithRetry(url, payload, tries){
+    const controller = new AbortController();
+    const timer = setTimeout(function(){ controller.abort(); }, 10000); // 10s
+    try{
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-regpro-version": "v3-json" },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      let json = {};
+      try{ json = await res.json(); } catch(_){}
+      if (!res.ok || !json || json.ok !== true) throw new Error(json.error || ('HTTP '+res.status));
+      return json;
+    }catch(err){
+      clearTimeout(timer);
+      if (tries > 0) {
+        await new Promise(r => setTimeout(r, 400));
+        return postJsonWithRetry(url, payload, tries - 1);
+      }
+      throw err;
+    }
   }
 
   async function handleSubmit(e){
@@ -104,24 +133,16 @@
         disableUi(false); busy=false; return;
       }
 
-      // Deux exécutions v3 (actions distinctes = meilleur signal)
+      // Deux exécutions v3 (meilleur signal)
       var tokenAdmin = await window.getRecaptchaV3Token('regpro_admin');
       var tokenUser  = data.email ? await window.getRecaptchaV3Token('regpro_user') : null;
 
-      // Envoi au serveur (Infomaniak SMTP derrière)
-      const resp = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data, token: tokenAdmin, token_user: tokenUser, hp: hpVal })
-      });
+      // Envoi JSON — le backend générera le CSV et l’attachera à l’email admin
+      const payload = { data, token_admin: tokenAdmin, token_user: tokenUser, hp: hpVal };
 
-      const json = await resp.json().catch(()=>({}));
-      if (!resp.ok || !json.ok) {
-        console.error('[regpro] server error', json);
-        throw new Error(json && (json.error || json.message) || ('HTTP '+resp.status));
-      }
+      const resp = await postJsonWithRetry(ENDPOINT, payload, 2);
 
-      try{ form.dataset.regproHandled='1'; }catch(_){}
+      // OK → Merci immédiat (le serveur a déjà renvoyé 202/200 et traite l’email en arrière-plan)
       showThanks();
     }catch(err){
       console.error('[regpro] submit error', err);
@@ -133,13 +154,17 @@
   }
 
   form.addEventListener('submit', handleSubmit, { capture:true });
+  var submitBtn = form.querySelector('.regpro__btn');
   if (submitBtn){
     submitBtn.addEventListener('click', function(ev){
-      if (!form.checkValidity()) return;
+      if (!form.checkValidity()) return; // laisse le navigateur afficher la validation native
       ev.preventDefault(); ev.stopImmediatePropagation && ev.stopImmediatePropagation();
       handleSubmit(ev);
     }, { capture:true });
   }
 })();
 </script>
+
+
+
 
