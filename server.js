@@ -24,10 +24,16 @@ process.on('unhandledRejection', (reason, p) => {
 });
 
 
+function mask(v) {
+  if (!v) return v;
+  if (v.length <= 8) return '********';
+  return v.slice(0,4) + '…' + v.slice(-4);
+}
+
 console.log('→ Loaded ENV:',
-  'API_SECRET=',       process.env.API_SECRET,
-  'SHOPIFY_API_URL=',  process.env.SHOPIFY_API_URL,
-  'SHOPIFY_API_KEY=',  process.env.SHOPIFY_API_KEY
+  'API_SECRET=', mask(process.env.API_SECRET || ''),
+  'SHOPIFY_API_URL=', process.env.SHOPIFY_API_URL || '',
+  'SHOPIFY_API_KEY=', mask(process.env.SHOPIFY_API_KEY || '')
 );
 
 // Adresse interne pour copie des emails
