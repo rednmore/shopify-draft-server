@@ -240,7 +240,7 @@ function csvFromObject(obj) {
 function escapeHTML(s) {
   return String(s || '')
     .replace(/&/g, '&amp;')
-    .replace(/<//g, '&lt;')
+    .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
 async function verifyRecaptchaV3(token, expectedAction) {
