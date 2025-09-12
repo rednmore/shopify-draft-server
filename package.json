@@ -4,20 +4,22 @@
   "license": "UNLICENSED",
   "description": "Serveur pour créer des draft orders Shopify",
   "main": "server.js",
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "axios": "^1.7.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "express-rate-limit": "^7.4.0"
+    "express-rate-limit": "^7.4.0",
+    "nodemailer": "^6.9.14"
   },
   "overrides": {
-    "follow-redirects": "^1.15.9"
+    "minimist": "^1.2.8",
+    "follow-redirects": "^1.15.6"
   }
 }
