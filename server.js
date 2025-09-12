@@ -8,7 +8,7 @@
 // =========================================
 const express       = require('express');
 const bodyParser    = require('body-parser');
-const cors          = require('cors');
+const cors          = require('cors'); // laissé importé, mais non utilisé plus bas
 const fetch         = globalThis.fetch;
 const rateLimit     = require('express-rate-limit');
 const nodemailer    = require('nodemailer'); // <-- AJOUT
@@ -46,10 +46,10 @@ const ALLOWED_ORIGINS = [
   'https://www.zyö.com',
   'https://www.xn--zy-gka.com',
 
-  // Admin Shopify (correct sans www)
+  // Admin Shopify (sans www)
   'https://admin.shopify.com',
 
-  // Dev Shopify (myshopify subdomain correct)
+  // Dev Shopify (myshopify subdomain)
   'https://ikyum.myshopify.com',
 
   // Local
@@ -60,35 +60,61 @@ const ALLOWED_ORIGINS = [
   /\.cdn\.shopify\.com$/,
   /\.shopifycloud\.com$/,
 ];
+
 // évite template literal
 const shopifyBaseUrl = 'https://' + process.env.SHOPIFY_API_URL + '/admin/api/2023-10';
 
 // =========================================
 /* 4. MIDDLEWARES GLOBAUX */
 // =========================================
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    var ok = ALLOWED_ORIGINS.some(function(o) {
-      return typeof o === 'string'
-        ? o === origin
-        : o instanceof RegExp
-          ? o.test(origin)
-          : false;
-    });
-    if (ok) return callback(null, true);
-    console.warn('⛔ Origine refusée :', origin);
-    callback(new Error('CORS non autorisé'));
-  },
-  methods: ['GET','POST','PUT','OPTIONS'],
-  // ⚠️ Inclure les variantes en minuscules que le navigateur annonce en preflight
-  allowedHeaders: ['Content-Type','X-API-KEY','x-api-key','Authorization'],
-  optionsSuccessStatus: 204
-}));
-// Réponse explicite aux preflights universels (pratique pour diagnostics)
-app.options('*', (req, res) => res.sendStatus(204));
 
-app.use(bodyParser.json());
+// ✅ CORS dynamique "safe" pour vos domaines autorisés
+const ALLOWED_SET = new Set(
+  (Array.isArray(ALLOWED_ORIGINS) ? ALLOWED_ORIGINS : []).filter(v => typeof v === 'string')
+);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const isAllowed = !!origin && (
+    ALLOWED_SET.has(origin) ||
+    ALLOWED_ORIGINS.some(o => o instanceof RegExp ? o.test(origin) : o === origin)
+  );
+
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin'); // cache-safe
+  }
+
+  // Méthodes acceptées
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+
+  // Reflète exactement les headers demandés par le navigateur (évite d'oublier un header custom)
+  const reqAllowed = req.headers['access-control-request-headers'];
+  if (reqAllowed) {
+    res.setHeader('Access-Control-Allow-Headers', reqAllowed);
+  } else {
+    // Par défaut, les plus courants
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+  }
+
+  // Si vous utilisez des cookies/Authorization côté client, décommentez :
+  // res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    // Logs de debug preflight
+    console.log('[CORS][OPTIONS]',
+      'origin=', origin,
+      'req-headers=', reqAllowed || '(none)',
+      'path=', req.originalUrl
+    );
+    return res.status(204).end();
+  }
+
+  next();
+});
+
+// Augmente la limite JSON (utile si payload un peu lourd)
+app.use(bodyParser.json({ limit: '2mb' }));
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -214,7 +240,7 @@ function csvFromObject(obj) {
 function escapeHTML(s) {
   return String(s || '')
     .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
+    .replace(/<//g, '&lt;')
     .replace(/>/g, '&gt;');
 }
 async function verifyRecaptchaV3(token, expectedAction) {
