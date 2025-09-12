@@ -38,15 +38,27 @@ app.set('trust proxy', 1); // Faire confiance au proxy pour X-Forwarded-
 /* 3. CONSTANTES GLOBALES */
 // =========================================
 const ALLOWED_ORIGINS = [
-  'https://www.ikyum.com',            // <-- AJOUT : IKYUM
-  'https://www.admin.shopify.com',     // <-- AJOUT : IKYUM - dev mod
-  'https://www.ikyum.myshopify.com',     // <-- AJOUT : IKYUM - dev mode
-  'https://www.xn--zy-gka.com',
+  // Domaines IKYUM (avec et sans www)
+  'https://ikyum.com',
+  'https://www.ikyum.com',
+
+  // Domaine ZYÖ (Unicode) + punycode
   'https://www.zyö.com',
+  'https://www.xn--zy-gka.com',
+
+  // Admin Shopify (correct sans www)
+  'https://admin.shopify.com',
+
+  // Dev Shopify (myshopify subdomain correct)
+  'https://ikyum.myshopify.com',
+
+  // Local
   'http://localhost:3000',
+
+  // Patterns Shopify
   /\.myshopify\.com$/,
   /\.cdn\.shopify\.com$/,
-  /\.shopifycloud\.com$/
+  /\.shopifycloud\.com$/,
 ];
 // évite template literal
 const shopifyBaseUrl = 'https://' + process.env.SHOPIFY_API_URL + '/admin/api/2023-10';
@@ -69,10 +81,15 @@ app.use(cors({
     callback(new Error('CORS non autorisé'));
   },
   methods: ['GET','POST','PUT','OPTIONS'],
-  allowedHeaders: ['Content-Type','X-API-KEY'],
-  optionsSuccessStatus: 200
+  // ⚠️ Inclure les variantes en minuscules que le navigateur annonce en preflight
+  allowedHeaders: ['Content-Type','X-API-KEY','x-api-key','Authorization'],
+  optionsSuccessStatus: 204
 }));
+// Réponse explicite aux preflights universels (pratique pour diagnostics)
+app.options('*', (req, res) => res.sendStatus(204));
+
 app.use(bodyParser.json());
+
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
