@@ -14,6 +14,16 @@ const rateLimit     = require('express-rate-limit');
 const nodemailer    = require('nodemailer'); // <-- AJOUT
 require('dotenv').config();
 
+// === Handlers globaux pour LOGUER les erreurs fatales ===
+process.on('uncaughtException', (err) => {
+  console.error('❌ UncaughtException:', err?.stack || err);
+  // Ne pas process.exit ici -> laissez Render redémarrer si nécessaire
+});
+process.on('unhandledRejection', (reason, p) => {
+  console.error('❌ UnhandledRejection at:', p, 'reason:', reason);
+});
+
+
 console.log('→ Loaded ENV:',
   'API_SECRET=',       process.env.API_SECRET,
   'SHOPIFY_API_URL=',  process.env.SHOPIFY_API_URL,
