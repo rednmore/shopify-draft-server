@@ -20,9 +20,9 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       {% endif %}
     </header>
 
-    {%- form 'create_customer', id: 'RegisterForm', novalidate: true, class: 'regpro__form',
-    data-endpoint: section.settings.endpoint_url-%}
-      {{ form.errors | default_errors }}
+       <!-- Formulaire RegPro (custom, sans helper Shopify pour éviter hCaptcha) -->
+    <form id="RegisterForm" novalidate class="regpro__form" data-endpoint="{{ section.settings.endpoint_url }}">
+      {# Ligne d’erreurs Shopify supprimée volontairement : {{ form.errors | default_errors }} #}
 
       <div class="regpro__grid" id="CompanyGrid">
         {% for block in section.blocks %}
@@ -166,7 +166,9 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
         <button type="submit" class="regpro__btn">{{ section.settings.button_label }}</button>
         <!-- Le texte "Mandatory fields" sera injecté juste dessous par JS -->
       </div>
-    {%- endform -%}
+    </form>
+
+
 
     <!-- Thank You panel (hidden by default) -->
     <div id="RegproThanks" class="regpro__thanks" hidden>
@@ -970,48 +972,43 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
 
 {%- comment -%} === IKYUM-REGPRO: reCAPTCHA v3 client === {%- endcomment -%}
 {%- if section.settings.recaptcha_site_key and section.settings.recaptcha_site_key != blank -%}
-  <script src="https://www.google.com/recaptcha/api.js?render={{ section.settings.recaptcha_site_key }}"></script>
-  <input type="hidden" name="recaptcha_token" id="recaptcha_token" value="">
-  <script>
-    (function(){
-      var SITE_KEY = "{{ section.settings.recaptcha_site_key }}";
-      function refreshRecaptcha(){
-        if (!window.grecaptcha || !SITE_KEY) return;
-        grecaptcha.ready(function(){
-          grecaptcha.execute(SITE_KEY, {action: 'regpro_submit'}).then(function(token){
-            var fld = document.getElementById('recaptcha_token');
-            if (fld) fld.value = token || '';
-          });
+<script src="https://www.google.com/recaptcha/api.js?render={{ section.settings.recaptcha_site_key }}" async defer></script>
+<script>
+  (function(){
+    var SITE_KEY = "{{ section.settings.recaptcha_site_key }}";
+    function refreshRecaptcha(){
+      if (!window.grecaptcha || !SITE_KEY) return;
+      grecaptcha.ready(function(){
+        grecaptcha.execute(SITE_KEY, {action: 'regpro_submit'}).then(function(token){
+          var fld = document.getElementById('recaptcha_token');
+          if (fld) fld.value = token || '';
         });
-      }
-      document.addEventListener('DOMContentLoaded', refreshRecaptcha);
-      // Renouvelle le token périodiquement (validité courte côté Google)
-      setInterval(refreshRecaptcha, 90*1000);
-    })();
-  </script>
+      });
+    }
+    document.addEventListener('DOMContentLoaded', refreshRecaptcha);
+    // Renouvelle le token périodiquement (validité courte côté Google)
+    setInterval(refreshRecaptcha, 90*1000);
+  })();
+</script>
 {%- else -%}
   <!-- reCAPTCHA désactivé: renseignez "reCAPTCHA site key" dans la section -->
 {%- endif -%}
 
-
 {% render 'RegPro-submit-handler' %}
-
 
  </section>
 
 {% schema %}
-
-{ "type": "text", "id": "endpoint_url", "label": "Backend endpoint URL", "default": "https://<VOTRE-APP-RENDER>.onrender.com/regpro/submit" },
-{ "type": "text", "id": "mandatory_hint", "label": "Mandatory hint text", "default": "*Champs obligatoires" },
-{ "type": "text", "id": "thanks_title", "label": "Thanks title", "default": "Merci !" },
-{ "type": "text", "id": "thanks_text", "label": "Thanks text", "default": "Votre demande a été envoyée. Nous vous répondrons rapidement." },
-{ "type": "text", "id": "thanks_back_label", "label": "Thanks back button", "default": "Retour à l’accueil" }
-{ "type": "text", "id": "recaptcha_site_key", "label": "reCAPTCHA v3 – Site key", "default": "" },
-{ "type": "text", "id": "endpoint_url", "label": "Backend endpoint URL", "default": "https://shopify-draft-server.onrender.com/ikyum/regpro/submit" }
-
 {
   "name": "Register Pro",
   "settings": [
+    { "type": "text", "id": "endpoint_url", "label": "Backend endpoint URL", "default": "https://<VOTRE-APP-RENDER>.onrender.com/ikyum/regpro/submit" },
+    { "type": "text", "id": "recaptcha_site_key", "label": "reCAPTCHA v3 – Site key", "default": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw" },
+    { "type": "text", "id": "mandatory_hint", "label": "Mandatory hint text", "default": "*Champs obligatoires" },
+    { "type": "text", "id": "thanks_title", "label": "Thanks title", "default": "Merci !" },
+    { "type": "text", "id": "thanks_text", "label": "Thanks text", "default": "Votre demande a été envoyée. Nous vous répondrons rapidement." },
+    { "type": "text", "id": "thanks_back_label", "label": "Thanks back button", "default": "Retour à l’accueil" },
+
     { "type": "text", "id": "title", "label": "Title", "default": "Create an account" },
     { "type": "text", "id": "subtitle", "label": "Subtitle", "default": "Access your customer area." },
     { "type": "text", "id": "email_hint", "label": "Email hint", "default": "We never share your email." },
@@ -1162,39 +1159,39 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
       "name": "Register Pro",
       "category": "Customers",
       "blocks": [
-        { "type": "field_text",    "settings": { "label": "Company Name",            "key": "company_name", "placeholder": "Acme SA",                             "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
-        { "type": "field_text",    "settings": { "label": "Company Registration n°", "key": "company_registration", "placeholder": "CHE-123.456.789",            "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
-        { "type": "field_text",    "settings": { "label": "VAT n°",                  "key": "vat",           "placeholder": "CHE-123.456.789 TVA",                "width": "half", "size": "normal", "required": true,  "mask": "none","pattern": "^.*$"} },
+        { "type": "field_text", "settings": { "label": "Company Name", "key": "company_name", "placeholder": "Acme SA", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "Company Registration n°", "key": "company_registration", "placeholder": "CHE-123.456.789", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "VAT n°", "key": "vat", "placeholder": "CHE-123.456.789 TVA", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
 
-        { "type": "field_text",    "settings": { "label": "Street",                  "key": "street",        "placeholder": "Rue de la Gare",                     "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
-        { "type": "field_text",    "settings": { "label": "Number",                  "key": "number",        "placeholder": "12A",                                "width": "half", "size": "sm",     "required": true,  "mask": "none",   "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "Street", "key": "street", "placeholder": "Rue de la Gare", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "Number", "key": "number", "placeholder": "12A", "width": "half", "size": "sm", "required": true, "mask": "none", "pattern": "^.*$" } },
 
-        { "type": "field_text",    "settings": { "label": "Postcode",                "key": "postcode",      "placeholder": "1000",                               "width": "half", "size": "normal", "required": true,  "mask": "int",    "pattern": "^\\d{3,10}$" } },
-        { "type": "field_text",    "settings": { "label": "City",                    "key": "city",          "placeholder": "Lausanne",                           "width": "half", "size": "normal", "required": true,  "mask": "none",   "pattern": "^.*$" } },
-        { "type": "field_select",  "settings": { "label": "Country",                 "key": "country",       "include_blank": "Select a country",                 "source": "countries", "width": "half", "size": "normal", "required": true } },
+        { "type": "field_text", "settings": { "label": "Postcode", "key": "postcode", "placeholder": "1000", "width": "half", "size": "normal", "required": true, "mask": "int", "pattern": "^\\d{3,10}$" } },
+        { "type": "field_text", "settings": { "label": "City", "key": "city", "placeholder": "Lausanne", "width": "half", "size": "normal", "required": true, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_select", "settings": { "label": "Country", "key": "country", "include_blank": "Select a country", "source": "countries", "width": "half", "size": "normal", "required": true } },
 
-        { "type": "field_text",    "settings": { "label": "Contact person (first and last name)", "key": "contact_person", "placeholder": "Jane Doe",         "width": "half", "size": "normal", "required": false,  "mask": "none",   "pattern": "^.*$" } },
-        { "type": "field_tel",     "settings": { "label": "Telephone",               "key": "telephone",     "placeholder": "+41 21 123 45 67",                   "width": "half",                   "required": false } },
+        { "type": "field_text", "settings": { "label": "Contact person (first and last name)", "key": "contact_person", "placeholder": "Jane Doe", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_tel", "settings": { "label": "Telephone", "key": "telephone", "placeholder": "+41 21 123 45 67", "width": "half", "required": false } },
 
-        { "type": "field_email",   "settings": { "label": "E-mail",                  "key": "email",         "placeholder": "name@example.com",                   "width": "half",                   "required": true } },
-        { "type": "field_email",   "settings": { "label": "E-mail finance",          "key": "finance_email", "placeholder": "finance@example.com",                "width": "half",                   "required": false } },
+        { "type": "field_email", "settings": { "label": "E-mail", "key": "email", "placeholder": "name@example.com", "width": "half", "required": true } },
+        { "type": "field_email", "settings": { "label": "E-mail finance", "key": "finance_email", "placeholder": "finance@example.com", "width": "half", "required": false } },
 
-        { "type": "field_text",    "settings": { "label": "IBAN",                    "key": "iban",          "placeholder": "CH93 0076 2011 6238 5295 7",         "width": "half", "size": "normal", "required": false, "mask": "iban",   "pattern": "^[A-Z]{2}[0-9A-Z]{2}(?: ?[0-9A-Z]{4}){2,7}$" } },
-        { "type": "field_text",    "settings": { "label": "BIC/SWIFT",               "key": "swift",         "placeholder": "ABCDEFGHXXX",                        "width": "half", "size": "normal", "required": false, "mask": "swift",  "pattern": "^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$" } },
+        { "type": "field_text", "settings": { "label": "IBAN", "key": "iban", "placeholder": "CH93 0076 2011 6238 5295 7", "width": "half", "size": "normal", "required": false, "mask": "iban", "pattern": "^[A-Z]{2}[0-9A-Z]{2}(?: ?[0-9A-Z]{4}){2,7}$" } },
+        { "type": "field_text", "settings": { "label": "BIC/SWIFT", "key": "swift", "placeholder": "ABCDEFGHXXX", "width": "half", "size": "normal", "required": false, "mask": "swift", "pattern": "^[A-Z0-9]{8}(?:[A-Z0-9]{3})?$" } },
 
-        { "type": "field_number",  "settings": { "label": "Weekly delivery frequency", "key": "weekly_delivery_frequency", "placeholder": "2",              "width": "half",                   "required": false } },
-        { "type": "field_select",  "settings": { "label": "Dispatch Day1",           "key": "dispatch_day1", "include_blank": "Select a day", "source": "days",   "width": "half", "size": "normal", "required": false } },
-        { "type": "field_select",  "settings": { "label": "Dispatch Day2",           "key": "dispatch_day2", "include_blank": "Select a day", "source": "days",   "width": "half", "size": "normal", "required": false } },
+        { "type": "field_number", "settings": { "label": "Weekly delivery frequency", "key": "weekly_delivery_frequency", "placeholder": "2", "width": "half", "required": false } },
+        { "type": "field_select", "settings": { "label": "Dispatch Day1", "key": "dispatch_day1", "include_blank": "Select a day", "source": "days", "width": "half", "size": "normal", "required": false } },
+        { "type": "field_select", "settings": { "label": "Dispatch Day2", "key": "dispatch_day2", "include_blank": "Select a day", "source": "days", "width": "half", "size": "normal", "required": false } },
 
-        { "type": "field_text",    "settings": { "label": "Name",                    "key": "delivery_name",           "placeholder": "Acma SA",     "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
-        { "type": "field_text",    "settings": { "label": "Street",                  "key": "delivery_street",         "placeholder": "Rue du Port",          "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
-        { "type": "field_text",    "settings": { "label": "Number",                  "key": "delivery_number",         "placeholder": "5B",                   "width": "half", "size": "sm",     "required": false, "mask": "none",  "pattern": "^.*$" } },
-        { "type": "field_text",    "settings": { "label": "Postcode",                "key": "delivery_postcode",       "placeholder": "1000",                 "width": "half", "size": "normal", "required": false, "mask": "int",   "pattern": "^\\d{3,10}$" } },
-        { "type": "field_text",    "settings": { "label": "City",                    "key": "delivery_city",           "placeholder": "Lausanne",             "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
-        { "type": "field_select",  "settings": { "label": "Country",                 "key": "delivery_country",        "include_blank": "Select a country",   "source": "countries", "width": "half", "size": "normal", "required": false } },
-        { "type": "field_text",    "settings": { "label": "Contact person (first and last name)", "key": "delivery_contact_person", "placeholder": "Dock contact", "width": "half", "size": "normal", "required": false, "mask": "none",  "pattern": "^.*$" } },
-        { "type": "field_tel",     "settings": { "label": "Telephone",               "key": "delivery_telephone",      "placeholder": "+41 21 000 00 00",     "width": "half",                   "required": false } },
-        { "type": "field_email",   "settings": { "label": "E-mail",                  "key": "delivery_email",          "placeholder": "dock@example.com",     "width": "half",                   "required": false } }
+        { "type": "field_text", "settings": { "label": "Name", "key": "delivery_name", "placeholder": "Acma SA", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "Street", "key": "delivery_street", "placeholder": "Rue du Port", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "Number", "key": "delivery_number", "placeholder": "5B", "width": "half", "size": "sm", "required": false, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_text", "settings": { "label": "Postcode", "key": "delivery_postcode", "placeholder": "1000", "width": "half", "size": "normal", "required": false, "mask": "int", "pattern": "^\\d{3,10}$" } },
+        { "type": "field_text", "settings": { "label": "City", "key": "delivery_city", "placeholder": "Lausanne", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_select", "settings": { "label": "Country", "key": "delivery_country", "include_blank": "Select a country", "source": "countries", "width": "half", "size": "normal", "required": false } },
+        { "type": "field_text", "settings": { "label": "Contact person (first and last name)", "key": "delivery_contact_person", "placeholder": "Dock contact", "width": "half", "size": "normal", "required": false, "mask": "none", "pattern": "^.*$" } },
+        { "type": "field_tel", "settings": { "label": "Telephone", "key": "delivery_telephone", "placeholder": "+41 21 000 00 00", "width": "half", "required": false } },
+        { "type": "field_email", "settings": { "label": "E-mail", "key": "delivery_email", "placeholder": "dock@example.com", "width": "half", "required": false } }
       ]
     }
   ]
