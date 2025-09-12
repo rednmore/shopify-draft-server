@@ -1,0 +1,173 @@
+{% assign ns = section.id %}
+
+{% style %}
+  .coatings-{{ ns }}{ padding:{{ section.settings.section_padding }}px 20px; background:{{ section.settings.background_color }}; color:{{ section.settings.text_color }}; }
+  .coatings-{{ ns }} .wrap{ max-width:1200px; margin:0 auto; }
+  .coatings-{{ ns }} .hdr{ text-align:center; margin-bottom:{{ section.settings.header_spacing }}px; }
+  .coatings-{{ ns }} .ttl{ font-size:{{ section.settings.title_size }}px; color:{{ section.settings.title_color }}; margin:0 0 12px; font-weight:600; }
+  .coatings-{{ ns }} .sub{ font-size:{{ section.settings.subtitle_size }}px; color:{{ section.settings.subtitle_color }}; margin:0; opacity:.85; }
+
+  /* Grid d’un bloc (= 3 cartes) */
+  .coatings-{{ ns }} .triplet{ display:grid; grid-template-columns:repeat(3,1fr); gap:{{ section.settings.card_spacing }}px; margin-top:{{ section.settings.grid_spacing }}px; }
+  .coatings-{{ ns }} .card{ background:{{ section.settings.card_background }}; border:1px solid {{ section.settings.card_border_color }}; border-radius:{{ section.settings.card_border_radius }}px; padding:{{ section.settings.card_padding }}px; box-shadow:0 4px 12px rgba(0,0,0,.08); transition:transform .25s ease, box-shadow .25s ease; }
+  .coatings-{{ ns }} .card:hover{ transform:translateY(-4px); box-shadow:0 8px 20px rgba(0,0,0,.12); }
+
+  /* Image héros en tête de carte (pleine largeur, hauteur réglable) */
+  .coatings-{{ ns }} .hero{ width:100%; height:{{ section.settings.hero_height }}px; margin:0 0 14px; border-radius:{{ section.settings.card_border_radius }}px; overflow:hidden; background:{{ section.settings.icon_background }}; }
+  .coatings-{{ ns }} .hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .coatings-{{ ns }} .hero .ph{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  .coatings-{{ ns }} .hero .ph svg{ width:{{ section.settings.icon_size }}px; height:auto; color:{{ section.settings.icon_color }}; opacity:.7; }
+
+  .coatings-{{ ns }} .name{ font-size:{{ section.settings.coating_name_size }}px; color:{{ section.settings.coating_name_color }}; font-weight:700; margin:8px 0 8px; text-align:center; }
+  .coatings-{{ ns }} .tagl{ font-size:{{ section.settings.tagline_size }}px; color:{{ section.settings.tagline_color }}; font-weight:500; text-align:center; margin:0 0 12px; }
+  .coatings-{{ ns }} .desc{ font-size:{{ section.settings.description_size }}px; color:{{ section.settings.description_color }}; line-height:1.6; text-align:center; margin:0; }
+
+  @media (max-width: 992px){
+    .coatings-{{ ns }} .triplet{ grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width: 640px){
+    .coatings-{{ ns }} .triplet{ grid-template-columns:1fr; }
+    .coatings-{{ ns }}{ padding:{{ section.settings.section_padding | times: 0.7 }}px 16px; }
+    .coatings-{{ ns }} .ttl{ font-size:{{ section.settings.title_size | times: 0.85 }}px; }
+  }
+{% endstyle %}
+
+<div class="coatings-{{ ns }}">
+  <div class="wrap">
+    {% if section.settings.show_header %}
+      <header class="hdr">
+        {% if section.settings.title != blank %}<h2 class="ttl">{{ section.settings.title }}</h2>{% endif %}
+        {% if section.settings.subtitle != blank %}<p class="sub">{{ section.settings.subtitle }}</p>{% endif %}
+      </header>
+    {% endif %}
+
+    {%- for block in section.blocks -%}
+      <div class="triplet" {{ block.shopify_attributes }}>
+        {%- comment -%} Carte 1 du bloc {%- endcomment -%}
+        {%- if block.settings.c1_name != blank or block.settings.c1_image != blank or block.settings.c1_tagline != blank or block.settings.c1_desc != blank -%}
+          <article class="card">
+            <div class="hero">
+              {% if block.settings.c1_image %}
+                <img src="{{ block.settings.c1_image | image_url: width: 1400 }}" alt="{{ block.settings.c1_name | default: 'Coating' | escape }}" loading="lazy">
+              {% else %}
+                <div class="ph">{{ 'image' | placeholder_svg_tag }}</div>
+              {% endif %}
+            </div>
+            {% if block.settings.c1_name != blank %}<h3 class="name">{{ block.settings.c1_name }}</h3>{% endif %}
+            {% if block.settings.c1_tagline != blank %}<p class="tagl">{{ block.settings.c1_tagline }}</p>{% endif %}
+            {% if block.settings.c1_desc != blank %}<p class="desc">{{ block.settings.c1_desc }}</p>{% endif %}
+          </article>
+        {%- endif -%}
+
+        {%- comment -%} Carte 2 du bloc {%- endcomment -%}
+        {%- if block.settings.c2_name != blank or block.settings.c2_image != blank or block.settings.c2_tagline != blank or block.settings.c2_desc != blank -%}
+          <article class="card">
+            <div class="hero">
+              {% if block.settings.c2_image %}
+                <img src="{{ block.settings.c2_image | image_url: width: 1400 }}" alt="{{ block.settings.c2_name | default: 'Coating' | escape }}" loading="lazy">
+              {% else %}
+                <div class="ph">{{ 'image' | placeholder_svg_tag }}</div>
+              {% endif %}
+            </div>
+            {% if block.settings.c2_name != blank %}<h3 class="name">{{ block.settings.c2_name }}</h3>{% endif %}
+            {% if block.settings.c2_tagline != blank %}<p class="tagl">{{ block.settings.c2_tagline }}</p>{% endif %}
+            {% if block.settings.c2_desc != blank %}<p class="desc">{{ block.settings.c2_desc }}</p>{% endif %}
+          </article>
+        {%- endif -%}
+
+        {%- comment -%} Carte 3 du bloc {%- endcomment -%}
+        {%- if block.settings.c3_name != blank or block.settings.c3_image != blank or block.settings.c3_tagline != blank or block.settings.c3_desc != blank -%}
+          <article class="card">
+            <div class="hero">
+              {% if block.settings.c3_image %}
+                <img src="{{ block.settings.c3_image | image_url: width: 1400 }}" alt="{{ block.settings.c3_name | default: 'Coating' | escape }}" loading="lazy">
+              {% else %}
+                <div class="ph">{{ 'image' | placeholder_svg_tag }}</div>
+              {% endif %}
+            </div>
+            {% if block.settings.c3_name != blank %}<h3 class="name">{{ block.settings.c3_name }}</h3>{% endif %}
+            {% if block.settings.c3_tagline != blank %}<p class="tagl">{{ block.settings.c3_tagline }}</p>{% endif %}
+            {% if block.settings.c3_desc != blank %}<p class="desc">{{ block.settings.c3_desc }}</p>{% endif %}
+          </article>
+        {%- endif -%}
+      </div>
+    {%- endfor -%}
+
+    {% if section.blocks.size == 0 %}
+      <div class="triplet">
+        <article class="card"><div class="hero"><div class="ph">{{ 'image' | placeholder_svg_tag }}</div></div><h3 class="name">Clarity</h3><p class="tagl">Essential protection for everyday clarity.</p><p class="desc">Anti-reflective + scratch resistance for daily performance.</p></article>
+        <article class="card"><div class="hero"><div class="ph">{{ 'image' | placeholder_svg_tag }}</div></div><h3 class="name">Clarity B-UV</h3><p class="tagl">Advanced UV + blue-light filtration.</p><p class="desc">Blocks UV; reduces digital eye strain while keeping color fidelity.</p></article>
+        <article class="card"><div class="hero"><div class="ph">{{ 'image' | placeholder_svg_tag }}</div></div><h3 class="name">Clarity Achromatic</h3><p class="tagl">True-to-life color accuracy.</p><p class="desc">Multi-layer tech minimizing chromatic aberrations for precision.</p></article>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "IKYUM coatings grid",
+  "settings": [
+    { "type": "checkbox", "id": "show_header", "label": "Show header", "default": true },
+    { "type": "text", "id": "title", "label": "Title", "default": "Premium Lens Coatings" },
+    { "type": "text", "id": "subtitle", "label": "Subtitle", "default": "Advanced optical technologies for superior vision performance" },
+
+    { "type": "header", "content": "Layout" },
+    { "type": "range", "id": "section_padding", "min": 20, "max": 100, "step": 5, "unit": "px", "label": "Section padding", "default": 60 },
+    { "type": "range", "id": "header_spacing", "min": 20, "max": 80, "step": 5, "unit": "px", "label": "Header spacing", "default": 35 },
+    { "type": "range", "id": "grid_spacing", "min": 10, "max": 80, "step": 2, "unit": "px", "label": "Spacing between rows", "default": 32 },
+    { "type": "range", "id": "card_spacing", "min": 10, "max": 40, "step": 2, "unit": "px", "label": "Spacing between cards", "default": 16 },
+    { "type": "range", "id": "card_padding", "min": 16, "max": 48, "step": 2, "unit": "px", "label": "Card padding", "default": 24 },
+    { "type": "range", "id": "card_border_radius", "min": 0, "max": 20, "step": 2, "unit": "px", "label": "Card border radius", "default": 12 },
+    { "type": "range", "id": "hero_height", "min": 140, "max": 420, "step": 10, "unit": "px", "label": "Hero image height", "default": 260 },
+
+    { "type": "header", "content": "Colors" },
+    { "type": "color", "id": "background_color", "label": "Background", "default": "#ffffff" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#1c1c1c" },
+    { "type": "color", "id": "card_background", "label": "Card background", "default": "#ffffff" },
+    { "type": "color", "id": "card_border_color", "label": "Card border", "default": "#e5e5e5" },
+    { "type": "color", "id": "icon_background", "label": "Hero background (when no image)", "default": "#f0f0f0" },
+    { "type": "color", "id": "icon_color", "label": "Placeholder icon color", "default": "#1c1c1c" },
+
+    { "type": "header", "content": "Typography" },
+    { "type": "range", "id": "title_size", "min": 20, "max": 48, "step": 2, "unit": "px", "label": "Title size", "default": 32 },
+    { "type": "color", "id": "title_color", "label": "Title color", "default": "#1c1c1c" },
+    { "type": "range", "id": "subtitle_size", "min": 14, "max": 22, "step": 1, "unit": "px", "label": "Subtitle size", "default": 17 },
+    { "type": "color", "id": "subtitle_color", "label": "Subtitle color", "default": "#666666" },
+    { "type": "range", "id": "coating_name_size", "min": 16, "max": 28, "step": 1, "unit": "px", "label": "Name size", "default": 20 },
+    { "type": "color", "id": "coating_name_color", "label": "Name color", "default": "#1c1c1c" },
+    { "type": "range", "id": "tagline_size", "min": 12, "max": 18, "step": 1, "unit": "px", "label": "Tagline size", "default": 14 },
+    { "type": "color", "id": "tagline_color", "label": "Tagline color", "default": "#0066cc" },
+    { "type": "range", "id": "description_size", "min": 12, "max": 18, "step": 1, "unit": "px", "label": "Description size", "default": 14 },
+    { "type": "color", "id": "description_color", "label": "Description color", "default": "#666666" }
+  ],
+  "blocks": [
+    {
+      "type": "triplet",
+      "name": "Triplet",
+      "settings": [
+        { "type": "header", "content": "Card 1" },
+        { "type": "image_picker", "id": "c1_image", "label": "Image" },
+        { "type": "text", "id": "c1_name", "label": "Name", "default": "Clarity" },
+        { "type": "text", "id": "c1_tagline", "label": "Tagline", "default": "Essential protection for everyday clarity." },
+        { "type": "textarea", "id": "c1_desc", "label": "Description", "default": "Anti-reflective and scratch-resistant coating for daily performance." },
+
+        { "type": "header", "content": "Card 2" },
+        { "type": "image_picker", "id": "c2_image", "label": "Image" },
+        { "type": "text", "id": "c2_name", "label": "Name", "default": "Clarity B-UV" },
+        { "type": "text", "id": "c2_tagline", "label": "Tagline", "default": "Advanced UV + blue-light filtration." },
+        { "type": "textarea", "id": "c2_desc", "label": "Description", "default": "Reduces digital eye strain while preserving natural color fidelity." },
+
+        { "type": "header", "content": "Card 3" },
+        { "type": "image_picker", "id": "c3_image", "label": "Image" },
+        { "type": "text", "id": "c3_name", "label": "Name", "default": "Clarity Achromatic" },
+        { "type": "text", "id": "c3_tagline", "label": "Tagline", "default": "True-to-life color accuracy." },
+        { "type": "textarea", "id": "c3_desc", "label": "Description", "default": "Multi-layer technology minimizing chromatic aberrations for precision." }
+      ]
+    }
+  ],
+  "max_blocks": 12,
+  "presets": [
+    { "name": "IKYUM coatings grid", "blocks": [{ "type": "triplet" }] }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,444 @@
+{%- if section.blocks.size > 0 -%}
+  {%- liquid
+    assign stack_mobile = section.settings.stack_collections_mobile
+    assign stack_desktop = section.settings.stack_collections
+    assign stack_mobile_and_desktop = false
+    if stack_desktop and stack_mobile
+      assign stack_mobile_and_desktop = true
+    endif
+
+    assign locale = request.locale.iso_code | downcase
+    assign lang = locale | split: '-' | first
+
+    # Localisation des textes d'en-tête (section) avec fallback
+    assign sec_sub = section.settings.subheading
+    assign sec_title = section.settings.title
+    assign sec_content = section.settings.content
+
+    if lang == 'fr'
+      if section.settings.subheading_fr != blank
+        assign sec_sub = section.settings.subheading_fr
+      endif
+      if section.settings.title_fr != blank
+        assign sec_title = section.settings.title_fr
+      endif
+      if section.settings.content_fr != blank
+        assign sec_content = section.settings.content_fr
+      endif
+    elsif lang == 'de'
+      if section.settings.subheading_de != blank
+        assign sec_sub = section.settings.subheading_de
+      endif
+      if section.settings.title_de != blank
+        assign sec_title = section.settings.title_de
+      endif
+      if section.settings.content_de != blank
+        assign sec_content = section.settings.content_de
+      endif
+    elsif lang == 'en'
+      if section.settings.subheading_en != blank
+        assign sec_sub = section.settings.subheading_en
+      endif
+      if section.settings.title_en != blank
+        assign sec_title = section.settings.title_en
+      endif
+      if section.settings.content_en != blank
+        assign sec_content = section.settings.content_en
+      endif
+    endif
+  -%}
+
+  <style>
+    #shopify-section-{{ section.id }} {
+      {%- if stack_mobile or stack_mobile_and_desktop -%}
+        --collection-list-items-per-row: {{ section.settings.collections_per_row_mobile | times: 1 }};
+      {%- else -%}
+        --collection-list-item-size: 84vw;
+      {%- endif -%}
+
+      {%- if section.settings.space_items -%}
+        --collection-list-gap: 1.5rem;
+      {%- endif -%}
+    }
+
+    @media screen and (min-width: 700px) {
+      #shopify-section-{{ section.id }} {
+        {%- if stack_mobile or stack_mobile_and_desktop -%}
+          --collection-list-items-per-row: {{ 2 | at_most: section.settings.collections_per_row_desktop }};
+        {%- else -%}
+          --collection-list-item-size: 62vw;
+        {%- endif -%}
+      }
+    }
+
+    @media screen and (min-width: 1150px) {
+      #shopify-section-{{ section.id }} {
+        --collection-list-item-size: unset;
+        --collection-list-items-per-row: {{ section.settings.collections_per_row_desktop }};
+        {%- if section.settings.space_items -%}
+          --collection-list-gap: 1.875rem;
+        {%- endif -%}
+      }
+    }
+
+    /* Stabilité du layout (la carte n'est pas cliquable) */
+    #shopify-section-{{ section.id }} .collection-card { display:block; position:relative; }
+    #shopify-section-{{ section.id }} .collection-card__content { position:relative; z-index:2; }
+    #shopify-section-{{ section.id }} .content-over-media { position:relative; overflow:hidden; }
+    #shopify-section-{{ section.id }} .content-over-media img { width:100%; height:100%; object-fit:cover; display:block; }
+  </style>
+
+  {%- assign remove_vertical_spacing = false -%}
+  {%- if sec_sub == blank and sec_title == blank and sec_content == blank -%}
+    {%- assign reduce_vertical_spacing = true -%}
+    {%- unless section.settings.space_items -%}
+      {%- assign remove_vertical_spacing = true -%}
+    {%- endunless -%}
+  {%- endif -%}
+
+  {%- assign color_scheme_hash = section.settings.color_scheme.settings.background_gradient | default: section.settings.color_scheme.settings.background | md5 -%}
+
+  <div class="{% unless remove_vertical_spacing %}section-spacing {% if reduce_vertical_spacing %}section-spacing--tight{% endif %}{% endunless %} color-scheme color-scheme--{{ section.settings.color_scheme.id }} color-scheme--bg-{{ color_scheme_hash }} {% if section.settings.separate_section_with_border %}bordered-section{% endif %}">
+    <div class="{% if section.settings.space_items %}container{% endif %}">
+      <div class="section-stack">
+        {%- render 'section-header',
+          subheading: sec_sub,
+          heading: sec_title,
+          content: sec_content,
+          text_alignment: 'center'
+        -%}
+
+        {% capture brochure_list %}
+          {%- for block in section.blocks -%}
+            {%- liquid
+              # URL PDF localisée avec fallback
+              assign pdf_url = block.settings.pdf_url
+              if lang == 'fr' and block.settings.pdf_url_fr != blank
+                assign pdf_url = block.settings.pdf_url_fr
+              elsif lang == 'de' and block.settings.pdf_url_de != blank
+                assign pdf_url = block.settings.pdf_url_de
+              elsif lang == 'en' and block.settings.pdf_url_en != blank
+                assign pdf_url = block.settings.pdf_url_en
+              endif
+
+              # Textes localisés du block (subheading, title, button_text)
+              assign b_sub = block.settings.subheading
+              assign b_title = block.settings.title
+              assign b_btn = block.settings.button_text
+
+              if lang == 'fr'
+                if block.settings.subheading_fr != blank
+                  assign b_sub = block.settings.subheading_fr
+                endif
+                if block.settings.title_fr != blank
+                  assign b_title = block.settings.title_fr
+                endif
+                if block.settings.button_text_fr != blank
+                  assign b_btn = block.settings.button_text_fr
+                endif
+              elsif lang == 'de'
+                if block.settings.subheading_de != blank
+                  assign b_sub = block.settings.subheading_de
+                endif
+                if block.settings.title_de != blank
+                  assign b_title = block.settings.title_de
+                endif
+                if block.settings.button_text_de != blank
+                  assign b_btn = block.settings.button_text_de
+                endif
+              elsif lang == 'en'
+                if block.settings.subheading_en != blank
+                  assign b_sub = block.settings.subheading_en
+                endif
+                if block.settings.title_en != blank
+                  assign b_title = block.settings.title_en
+                endif
+                if block.settings.button_text_en != blank
+                  assign b_btn = block.settings.button_text_en
+                endif
+              endif
+
+              # Lien du bouton : PDF localisé ou lien custom localisé
+              assign btn_href = ''
+              if block.settings.use_button
+                if block.settings.button_link_type == 'pdf'
+                  assign btn_href = pdf_url
+                elsif block.settings.button_link_type == 'custom'
+                  assign btn_href = block.settings.button_link
+                  if lang == 'fr' and block.settings.button_link_fr != blank
+                    assign btn_href = block.settings.button_link_fr
+                  elsif lang == 'de' and block.settings.button_link_de != blank
+                    assign btn_href = block.settings.button_link_de
+                  elsif lang == 'en' and block.settings.button_link_en != blank
+                    assign btn_href = block.settings.button_link_en
+                  endif
+                endif
+              endif
+            -%}
+
+            {%- capture brochure_card_info -%}
+              <div class="collection-card__content color-scheme color-scheme--{{ block.settings.color_scheme.id }} prose prose--tight {{ block.settings.content_position }}">
+                {%- if b_sub != blank -%}
+                  <p class="h6">{{- b_sub -}}</p>
+                {%- endif -%}
+                {%- if b_title != blank -%}
+                  <p class="h3">{{- b_title -}}</p>
+                {%- endif -%}
+
+                {%- if block.settings.use_button and b_btn != blank -%}
+                  {%- comment -%}
+                    Seul le bouton est cliquable :
+                    - si btn_href != blank => on rend un lien via le snippet 'button' (sans wrapper <a> autour)
+                    - sinon => vrai <button> (pas de lien)
+                  {%- endcomment -%}
+                  {%- if btn_href != blank -%}
+                    {%- render 'button',
+                      type: 'link',
+                      content: b_btn,
+                      style: block.settings.button_style,
+                      href: btn_href,
+                      url: btn_href,
+                      target: block.settings.button_new_tab | default: false | ternary: '_blank', '',
+                      rel: block.settings.button_new_tab | default: false | ternary: 'noopener', '',
+                      focusable: false
+                    -%}
+                  {%- else -%}
+                    {%- render 'button',
+                      type: 'button',
+                      content: b_btn,
+                      style: block.settings.button_style,
+                      focusable: false
+                    -%}
+                  {%- endif -%}
+                {%- endif -%}
+              </div>
+            {%- endcapture -%}
+
+            {%- capture brochure_card_content -%}
+              <div class="content-over-media content-over-media--{{ section.settings.image_size }}" style="--content-over-media-overlay: {{ block.settings.overlay_color.rgb }} / {{ block.settings.overlay_opacity | divided_by: 100.0 }};">
+                {%- assign image = block.settings.image -%}
+                {%- capture sizes -%}(max-width: 699px) 100vw, {% if block.settings.expand_brochure %}100vw{% else %}(max-width: 1149px) {{ 100 | divided_by: section.settings.collections_per_row_desktop | at_least: 50 }}vw, {{ 100 | divided_by: section.settings.collections_per_row_desktop }}vw{% endif %}{%- endcapture -%}
+
+                {%- if image != blank -%}
+                  {{- image
+                    | image_url: width: image.width
+                    | image_tag:
+                      sizes: sizes,
+                      widths: '200,300,400,500,600,800,1000,1200,1400,1600,1800,2000,2200,2400',
+                      class: 'zoom-image group-hover:zoom',
+                      draggable: 'false',
+                      alt: b_title | default: 'Brochure'
+                  -}}
+                {%- else -%}
+                  {%- capture brochure_placeholder -%}{%- cycle 'collection-1', 'collection-2', 'collection-3' -%}{%- endcapture -%}
+                  {{- brochure_placeholder | placeholder_svg_tag: 'placeholder zoom-image group-hover:zoom' | replace: '<svg', '<svg preserveAspectRatio="xMinYMin slice"' -}}
+                {%- endif -%}
+
+                {%- unless section.settings.show_text_outside -%}
+                  {{- brochure_card_info -}}
+                {%- endunless -%}
+              </div>
+
+              {%- if section.settings.show_text_outside -%}
+                {{- brochure_card_info -}}
+              {%- endif -%}
+            {%- endcapture -%}
+
+            <div class="collection-card {% if block.settings.expand_brochure %}grow{% endif %} {% unless stack_mobile_and_desktop %}shrink-0 snap-center{% endunless %} {% if forloop.first %}is-selected{% endif %} group" {{ block.shopify_attributes }}>
+              {{- brochure_card_content -}}
+            </div>
+          {%- endfor -%}
+        {% endcapture %}
+
+        {% if stack_mobile_and_desktop or section.blocks.size <= 1 %}
+          <div class="collection-list wrap {% if section.settings.show_text_outside %}collection-list--text-outside{% endif %}">
+            {{ brochure_list }}
+          </div>
+        {% else %}
+          {%- if stack_desktop or stack_mobile -%}
+            <div class="collection-list wrap {% if section.settings.show_text_outside %}collection-list--text-outside{% endif %} {% if stack_desktop and stack_mobile == false %}lg-max:hidden{% elsif stack_desktop == false and stack_mobile %}lg:hidden{% endif %}">
+              {{ brochure_list }}
+            </div>
+          {%- endif -%}
+
+          <div class="floating-controls-container floating-controls-container--inside floating-controls-container--on-hover {% if stack_desktop and stack_mobile == false %}lg:hidden{% elsif stack_desktop == false and stack_mobile %}lg-max:hidden{% endif %}">
+            {%- assign carousel_id = 'carousel-' | append: section.id -%}
+
+            <carousel-prev-button class="floating-controls-container__control" aria-controls="{{ carousel_id }}">
+              <button type="button" class="prev-next-button prev-next-button--prev circle-button circle-button--lg hover:animate-icon-inline" disabled>
+                <span class="sr-only">{{ 'general.accessibility.previous' | t }}</span>
+                {%- render 'icon' with 'arrow-left', direction_aware: true -%}
+              </button>
+            </carousel-prev-button>
+
+            <scroll-carousel id="{{ carousel_id }}" group-cells allow-drag class="collection-list scroll-area {% if section.settings.show_text_outside %}collection-list--text-outside{% endif %} bleed lg:unbleed">
+              {{ brochure_list }}
+            </scroll-carousel>
+
+            <carousel-next-button class="floating-controls-container__control" aria-controls="{{ carousel_id }}">
+              <button type="button" class="prev-next-button prev-next-button--next circle-button circle-button--lg hover:animate-icon-inline">
+                <span class="sr-only">{{ 'general.accessibility.next' | t }}</span>
+                {%- render 'icon' with 'arrow-right', direction_aware: true -%}
+              </button>
+            </carousel-next-button>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "IKYUM brochures PRO3",
+  "class": "shopify-section--collection-list",
+  "tag": "section",
+  "disabled_on": {
+    "templates": ["password"],
+    "groups": ["header", "custom.overlay"]
+  },
+  "settings": [
+    { "type": "color_scheme", "id": "color_scheme", "label": "t:global.colors.scheme", "default": "scheme-1" },
+    { "type": "checkbox", "id": "separate_section_with_border", "label": "t:global.section.separate_section_with_border", "default": true },
+
+    {
+      "type": "select",
+      "id": "image_size",
+      "label": "t:global.image.size",
+      "info": "t:global.image.ratio_avoid_cropping_info",
+      "options": [
+        { "value": "auto", "label": "t:global.sizes.original_image_ratio" },
+        { "value": "xs", "label": "t:global.sizes.x_small" },
+        { "value": "sm", "label": "t:global.sizes.small" },
+        { "value": "md", "label": "t:global.sizes.medium" },
+        { "value": "lg", "label": "t:global.sizes.large" }
+      ],
+      "default": "auto"
+    },
+    { "type": "checkbox", "id": "show_text_outside", "label": "t:sections.collection_list.show_text_outside", "default": false },
+    { "type": "checkbox", "id": "space_items", "label": "t:sections.collection_list.space_items", "default": true },
+    { "type": "checkbox", "id": "stack_collections", "label": "t:sections.collection_list.stack_collections", "default": true },
+    { "type": "range", "id": "collections_per_row_desktop", "min": 1, "max": 5, "label": "t:sections.collection_list.collections_per_row_desktop", "default": 3 },
+    { "type": "checkbox", "id": "stack_collections_mobile", "label": "t:sections.collection_list.stack_collections_mobile", "default": true },
+    {
+      "type": "select",
+      "id": "collections_per_row_mobile",
+      "label": "t:sections.collection_list.collections_per_row_mobile",
+      "options": [ { "value": "1", "label": "1" }, { "value": "2", "label": "2" } ],
+      "default": "1"
+    },
+
+    { "type": "header", "content": "Section header (DEFAULT)" },
+    { "type": "inline_richtext", "id": "subheading", "label": "Subheading" },
+    { "type": "inline_richtext", "id": "title", "label": "Title" },
+    { "type": "richtext", "id": "content", "label": "Content" },
+
+    { "type": "header", "content": "Section header (FR)" },
+    { "type": "inline_richtext", "id": "subheading_fr", "label": "Sous-titre (FR)" },
+    { "type": "inline_richtext", "id": "title_fr", "label": "Titre (FR)" },
+    { "type": "richtext", "id": "content_fr", "label": "Contenu (FR)" },
+
+    { "type": "header", "content": "Section header (EN)" },
+    { "type": "inline_richtext", "id": "subheading_en", "label": "Subheading (EN)" },
+    { "type": "inline_richtext", "id": "title_en", "label": "Title (EN)" },
+    { "type": "richtext", "id": "content_en", "label": "Content (EN)" },
+
+    { "type": "header", "content": "Section header (DE)" },
+    { "type": "inline_richtext", "id": "subheading_de", "label": "Untertitel (DE)" },
+    { "type": "inline_richtext", "id": "title_de", "label": "Titel (DE)" },
+    { "type": "richtext", "id": "content_de", "label": "Inhalt (DE)" }
+  ],
+  "blocks": [
+    {
+      "type": "brochure",
+      "name": "Brochure card",
+      "settings": [
+        { "type": "color_scheme", "id": "color_scheme", "label": "t:global.colors.scheme", "default": "scheme-4" },
+
+        { "type": "image_picker", "id": "image", "label": "Image", "info": "Recommandé : largeur ≥ 1600px" },
+
+        { "type": "checkbox", "id": "expand_brochure", "label": "Étendre pour remplir la rangée", "default": false, "visible_if": "{{ section.settings.stack_collections or section.settings.stack_collections_mobile }}" },
+
+        { "type": "select", "id": "content_position", "label": "Position du contenu",
+          "options": [
+            { "value": "place-self-start text-start", "label": "Haut gauche" },
+            { "value": "place-self-start-center text-center", "label": "Haut centre" },
+            { "value": "place-self-start-end text-end", "label": "Haut droite" },
+            { "value": "place-self-center-start text-start", "label": "Milieu gauche" },
+            { "value": "place-self-center text-center", "label": "Milieu centre" },
+            { "value": "place-self-center-end text-end", "label": "Milieu droite" },
+            { "value": "place-self-end-start text-start", "label": "Bas gauche" },
+            { "value": "place-self-end-center text-center", "label": "Bas centre" },
+            { "value": "place-self-end text-end", "label": "Bas droite" }
+          ],
+          "default": "place-self-end-start text-start"
+        },
+
+        { "type": "header", "content": "Textes (DEFAULT)" },
+        { "type": "inline_richtext", "id": "subheading", "label": "Sous-titre" },
+        { "type": "inline_richtext", "id": "title", "label": "Titre" },
+        { "type": "text", "id": "button_text", "label": "Texte du bouton", "default": "Voir la brochure" },
+
+        { "type": "header", "content": "Textes (FR)" },
+        { "type": "inline_richtext", "id": "subheading_fr", "label": "Sous-titre (FR)" },
+        { "type": "inline_richtext", "id": "title_fr", "label": "Titre (FR)" },
+        { "type": "text", "id": "button_text_fr", "label": "Texte du bouton (FR)" },
+
+        { "type": "header", "content": "Textes (EN)" },
+        { "type": "inline_richtext", "id": "subheading_en", "label": "Subheading (EN)" },
+        { "type": "inline_richtext", "id": "title_en", "label": "Title (EN)" },
+        { "type": "text", "id": "button_text_en", "label": "Button text (EN)" },
+
+        { "type": "header", "content": "Textes (DE)" },
+        { "type": "inline_richtext", "id": "subheading_de", "label": "Untertitel (DE)" },
+        { "type": "inline_richtext", "id": "title_de", "label": "Titel (DE)" },
+        { "type": "text", "id": "button_text_de", "label": "Schaltflächentext (DE)" },
+
+        { "type": "header", "content": "Bouton" },
+        { "type": "checkbox", "id": "use_button", "label": "Afficher le bouton", "default": true },
+        {
+          "type": "select",
+          "id": "button_link_type",
+          "label": "Lien du bouton",
+          "options": [
+            { "value": "pdf", "label": "Ouvrir la brochure (PDF localisé)" },
+            { "value": "custom", "label": "Lien personnalisé (URL localisée)" }
+          ],
+          "default": "pdf"
+        },
+        {
+          "type": "select",
+          "id": "button_style",
+          "label": "Style du bouton",
+          "options": [
+            { "value": "outline", "label": "Contour" },
+            { "value": "solid", "label": "Plein" },
+            { "value": "link", "label": "Lien" }
+          ],
+          "default": "solid"
+        },
+        { "type": "checkbox", "id": "button_new_tab", "label": "Ouvrir dans un nouvel onglet", "default": true },
+
+        { "type": "header", "content": "Lien personnalisé (si 'Lien du bouton' = Custom)" },
+        { "type": "url", "id": "button_link", "label": "URL par défaut" },
+        { "type": "url", "id": "button_link_fr", "label": "URL FR (optionnel)" },
+        { "type": "url", "id": "button_link_en", "label": "URL EN (optionnel)" },
+        { "type": "url", "id": "button_link_de", "label": "URL DE (optionnel)" },
+
+        { "type": "header", "content": "Liens PDF (URL dédiées – localisées)" },
+        { "type": "url", "id": "pdf_url", "label": "PDF URL (défaut, toutes langues)" },
+        { "type": "url", "id": "pdf_url_fr", "label": "PDF URL (FR – optionnel)" },
+        { "type": "url", "id": "pdf_url_en", "label": "PDF URL (EN – optionnel)" },
+        { "type": "url", "id": "pdf_url_de", "label": "PDF URL (DE – optionnel)" },
+
+        { "type": "header", "content": "Overlay" },
+        { "type": "color", "id": "overlay_color", "label": "Couleur d’overlay", "default": "#000000" },
+        { "type": "range", "id": "overlay_opacity", "label": "Opacité overlay", "min": 0, "max": 100, "step": 1, "unit": "%", "default": 30 }
+      ]
+    }
+  ],
+  "presets": [
+    { "name": "IKYUM brochures PRO3", "category": "custom", "blocks": [ { "type": "brochure" } ] }
+  ]
+}
+{% endschema %}
