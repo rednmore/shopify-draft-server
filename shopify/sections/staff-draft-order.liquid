@@ -34,7 +34,10 @@
       <!-- SÉLECTEUR -->
       <div class="client-combobox" style="margin-bottom: 20px;">
         <label class="field__label">{{ section.settings.select_label }}</label>
-        <select class="client-selector" style="width: 100%;"></select>
+        <select class="client-selector" style="width: 100%;">
+            <!-- Option vide nécessaire pour que TomSelect initialise bien son combobox -->
+            <option value=""></option>
+        </select>
       </div>
 
       <!-- CSS VAR STYLES -->
@@ -45,6 +48,79 @@
           --button-border: {{ section.settings.button_border }};
         }
       </style>
+
+<!-- CRÉER UN CLIENT (STAFF) -->
+<div class="staff-create-customer" style="margin: 24px 0;">
+  <details>
+    <summary class="h4" style="cursor:pointer;">Créer un nouveau client</summary>
+    <form class="staff-create-customer-form" novalidate>
+      <div class="grid" style="gap:12px;margin-top:12px;">
+        <div>
+          <label>Email *</label>
+          <input type="email" name="email" required>
+        </div>
+        <div>
+          <label>Prénom *</label>
+          <input type="text" name="first_name" required>
+        </div>
+        <div>
+          <label>Nom *</label>
+          <input type="text" name="last_name" required>
+        </div>
+        <div>
+          <label>Entreprise (company) *</label>
+          <input type="text" name="company" required>
+        </div>
+        <div>
+          <label>Téléphone</label>
+          <input type="tel" name="phone">
+        </div>
+
+        <!-- Adresse par défaut -->
+        <div>
+          <label>Adresse 1 *</label>
+          <input type="text" name="address1" required>
+        </div>
+        <div>
+          <label>Adresse 2</label>
+          <input type="text" name="address2">
+        </div>
+        <div>
+          <label>Code postal *</label>
+          <input type="text" name="zip" required>
+        </div>
+        <div>
+          <label>Ville *</label>
+          <input type="text" name="city" required>
+        </div>
+        <div>
+          <label>Pays (code ISO2, ex: CH) *</label>
+          <input type="text" name="country_code" maxlength="2" required>
+        </div>
+
+        <!-- Optionnel: TVA / Note / Tags -->
+        <div>
+          <label>TVA (optionnel)</label>
+          <input type="text" name="vat_number">
+        </div>
+        <div>
+          <label>Note (optionnel)</label>
+          <input type="text" name="note">
+        </div>
+        <div>
+          <label>Tags (séparés par des virgules)</label>
+          <input type="text" name="tags" placeholder="STAFF, B2B">
+        </div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+        <button type="submit" class="button" style="min-width:220px;">Créer le client</button>
+        <span class="create-feedback body" aria-live="polite"></span>
+      </div>
+    </form>
+  </details>
+</div>
+
 
       <!-- BOUTON -->
       <div>
