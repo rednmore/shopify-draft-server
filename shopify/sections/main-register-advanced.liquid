@@ -973,8 +973,10 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
   <script id="regpro-recaptcha-v3">
   (function(){
     var SITE_KEYS = {
-      "www.ikyum.com":      "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw",
-      "www.xn--zy-gka.com": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw"
+     "ikyum.com":          "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw",
+     "www.ikyum.com":      "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw",
+     "xn--zy-gka.com":     "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw", // zyö.com (apex, punycode)
+     "www.xn--zy-gka.com": "6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw"
     };
 
     var loaded=false, loading=false, queue=[], cacheKey=null;
@@ -1001,18 +1003,37 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
         document.head.appendChild(s);
       });
     }
+    // ▼ NEW getToken with timeout-aware retry
     async function getToken(action){
       await ensureApi();
       var key = siteKey();
-      return new Promise(function(resolve, reject){
-        try{
-          grecaptcha.ready(function(){
-            grecaptcha.execute(key, { action: action || "submit" })
-              .then(resolve).catch(reject);
-          });
-        }catch(e){ reject(e); }
-      });
+
+      async function once() {
+        return new Promise(function(resolve, reject){
+          try {
+            grecaptcha.ready(function(){
+              grecaptcha.execute(key, { action: action || "submit" })
+                .then(resolve)
+                .catch(reject);
+            });
+          } catch(e){ reject(e); }
+        });
+      }
+
+      try {
+        // 1er essai
+        return await once();
+      } catch(e) {
+        // Retry unique si le SDK renvoie un timeout (ex: “Timeout (o)”)
+        var msg = (e && (e.message || e.toString() || '')).toLowerCase();
+        if (msg.includes('timeout')) {
+          await new Promise(r => setTimeout(r, 600)); // petite pause
+          return await once(); // 2e essai
+        }
+        throw e; // autres erreurs -> on remonte
+      }
     }
+
     window.getRecaptchaV3Token = async function(action){
       try{ return await getToken(action); }
       catch(_){ return await getToken(action); }
@@ -1100,7 +1121,7 @@ Purpose: Corporate customer registration with all fields as dynamic blocks only.
         var tokenAdmin = await window.getRecaptchaV3Token('regpro_admin');
         var tokenUser  = data.email ? await window.getRecaptchaV3Token('regpro_user') : null;
 
-        const payload = { data, token_admin: tokenAdmin, token_user: tokenUser, hp: hpVal };
+        const payload = { data, token: tokenAdmin, token_user: tokenUser, hp: hpVal };
 
         await postJsonWithRetry(ENDPOINT, payload, 2);
 
