@@ -80,6 +80,14 @@ const ALLOWED_ORIGINS = [
 // évite template literal
 const shopifyBaseUrl = 'https://' + process.env.SHOPIFY_API_URL + '/admin/api/2023-10';
 
+// Headers Shopify (helper simple)
+function shopifyHeaders() {
+  return {
+    'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+    'Content-Type': 'application/json'
+  };
+}
+
 // =========================================
 /* 4. MIDDLEWARES GLOBAUX */
 // =========================================
@@ -178,10 +186,7 @@ app.get('/list-customers', async function(req, res) {
     var shopRes = await fetch(
       shopifyBaseUrl + '/customers.json?limit=100',
       {
-        headers: {
-          'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
-          'Content-Type': 'application/json'
-        }
+        headers: shopifyHeaders()
       }
     );
     var data = await shopRes.json();
@@ -194,10 +199,7 @@ app.get('/list-customers', async function(req, res) {
           var detailRes = await fetch(
             shopifyBaseUrl + '/customers/' + c.id + '.json',
             {
-              headers: {
-                'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
-                'Content-Type': 'application/json'
-              }
+              headers: shopifyHeaders()
             }
           );
           var full = (await detailRes.json()).customer;
@@ -290,6 +292,132 @@ function makeIkyumTransport() {
   });
 }
 
+/* ================================
+   9.a bis — HELPERS SHOPIFY COMPANY
+   (MAJ address.company côté Admin)
+   ================================ */
+
+// Trouve l'ID client par email (customers/search)
+async function findCustomerIdByEmail(email) {
+  if (!email) return null;
+  const q = encodeURIComponent(`email:${email}`);
+  const r = await fetch(`${shopifyBaseUrl}/customers/search.json?query=${q}`, {
+    headers: shopifyHeaders()
+  });
+  const j = await r.json().catch(()=>({}));
+  const c = Array.isArray(j.customers) ? j.customers[0] : null;
+  return c?.id || null;
+}
+
+// Récupère le détail complet d'un client
+async function fetchCustomerDetail(customerId) {
+  const r = await fetch(`${shopifyBaseUrl}/customers/${customerId}.json`, {
+    headers: shopifyHeaders()
+  });
+  const j = await r.json().catch(()=>({}));
+  return j.customer || null;
+}
+
+// Met à jour l'adresse par défaut (endpoint addresses)
+async function updateCustomerDefaultAddressCompany(customer, company) {
+  if (!customer || !company) return false;
+
+  // 1) cas idéal : default_address connu
+  if (customer.default_address?.id) {
+    const addrId = customer.default_address.id;
+    const body = {
+      address: {
+        ...customer.default_address,
+        company: company
+      }
+    };
+    const r = await fetch(`${shopifyBaseUrl}/customers/${customer.id}/addresses/${addrId}.json`, {
+      method: 'PUT',
+      headers: shopifyHeaders(),
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(()=> '');
+      console.warn('⚠️ update default_address.company failed:', r.status, t);
+      return false;
+    }
+    return true;
+  }
+
+  // 2) fallback : première adresse si présente
+  if (Array.isArray(customer.addresses) && customer.addresses[0]?.id) {
+    const addr = customer.addresses[0];
+    const body = {
+      address: {
+        ...addr,
+        company: company
+      }
+    };
+    const r = await fetch(`${shopifyBaseUrl}/customers/${customer.id}/addresses/${addr.id}.json`, {
+      method: 'PUT',
+      headers: shopifyHeaders(),
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(()=> '');
+      console.warn('⚠️ update first_address.company failed:', r.status, t);
+      return false;
+    }
+    return true;
+  }
+
+  // 3) dernier recours : créer une adresse minimale avec company et la définir par défaut
+  const createBody = {
+    address: {
+      company: company,
+      first_name: customer.first_name || '',
+      last_name: customer.last_name || '',
+      address1: customer.default_address?.address1 || customer.addresses?.[0]?.address1 || '',
+      city: customer.default_address?.city || customer.addresses?.[0]?.city || '',
+      country: customer.default_address?.country || customer.addresses?.[0]?.country || 'Switzerland',
+      default: true
+    }
+  };
+  const r = await fetch(`${shopifyBaseUrl}/customers/${customer.id}/addresses.json`, {
+    method: 'POST',
+    headers: shopifyHeaders(),
+    body: JSON.stringify(createBody)
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(()=> '');
+    console.warn('⚠️ create default address with company failed:', r.status, t);
+    return false;
+  }
+  return true;
+}
+
+// Orchestrateur : à partir de data RegPro, tente d'updater address.company
+async function ensureCustomerCompany(data) {
+  try {
+    const rawCompany = (data.company_name || data.company || '').trim();
+    if (!rawCompany) return { ok:false, reason:'no-company' };
+
+    // On privilégie un customer_id explicite si fourni
+    let customerId = data.customer_id && String(data.customer_id).match(/^\d+$/) ? String(data.customer_id) : null;
+
+    // Sinon, on tente par email
+    const userEmail = (data.email || data.contact_email || data.delivery_email || '').trim();
+    if (!customerId && userEmail) {
+      customerId = await findCustomerIdByEmail(userEmail);
+    }
+    if (!customerId) return { ok:false, reason:'no-customer' };
+
+    const customer = await fetchCustomerDetail(customerId);
+    if (!customer) return { ok:false, reason:'not-found' };
+
+    const ok = await updateCustomerDefaultAddressCompany(customer, rawCompany);
+    return ok ? { ok:true } : { ok:false, reason:'update-failed' };
+  } catch (e) {
+    console.warn('⚠️ ensureCustomerCompany error:', e?.message || e);
+    return { ok:false, reason:'exception' };
+  }
+}
+
 // =========================================
 /* 9.b. ENDPOINT IKYUM — RegPro (submit) — AJOUT
    N'IMPACTE PAS ZYO */
@@ -364,6 +492,17 @@ app.post('/ikyum/regpro/submit', ikyumLimiter, async function(req, res) {
         console.warn('[IKYUM user mail] recaptcha failed', userVR);
       }
     }
+
+    // === NOUVEAU : tentative de MAJ Admin -> address.company ===
+    if (process.env.SHOPIFY_API_URL && process.env.SHOPIFY_API_KEY) {
+      const syncRes = await ensureCustomerCompany(data);
+      if (!syncRes.ok) {
+        console.warn('⚠️ address.company not updated:', syncRes.reason);
+      }
+    } else {
+      console.warn('⚠️ Missing SHOPIFY_API_URL / SHOPIFY_API_KEY — skip address.company update');
+    }
+    // === /NOUVEAU ===
 
     return res.json({ ok:true });
   } catch (err) {
