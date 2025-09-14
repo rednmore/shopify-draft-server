@@ -1,0 +1,174 @@
+/* ===== STAFF DRAFT ORDER - ZYO Style ===== */
+
+.staff-draft-order-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.staff-draft-order-wrapper {
+  padding: 0 20px;
+  text-align: left;
+}
+
+/* Titre */
+.staff-draft-order-wrapper h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+/* Label du sélecteur */
+.staff-draft-order-wrapper .field__label {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+/* === VOS OVERRIDES TOMSELECT === */
+/* 1) Wrapper TomSelect (frère juste après <select>) */
+.client-combobox > select.client-selector + .ts-wrapper {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  height: 44px !important;
+  padding: 4px 8px !important;
+  background: #fff !important;
+  border: 1px solid !important;
+  border-radius: 0 !important;
+  font-size: 1.5rem !important;
+}
+
+/* 2) Flèche fine “▾” à droite */
+.client-combobox > select.client-selector + .ts-wrapper::after {
+  content: "▾";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: var(--button-border);
+  pointer-events: none;
+}
+
+/* Zone de saisie interne */
+.client-combobox > select.client-selector + .ts-wrapper .ts-control {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  font-size: 1.5rem !important;
+}
+
+/* Icône de loupe */
+.client-combobox > select.client-selector + .ts-wrapper .ts-control::before {
+  content: '🔍';
+  margin-right: 8px;
+  font-size: 1.5rem;
+  color: #888;
+}
+
+/* Champ de saisie */
+.client-combobox > select.client-selector + .ts-wrapper .ts-control input {
+  flex: 1 !important;
+  background: transparent;
+  padding: 6px;
+  font-size: 1.5rem !important;
+}
+
+/* Dropdown list */
+.client-combobox > select.client-selector + .ts-wrapper .ts-dropdown {
+  position: absolute;
+  top: calc(44px + 4px);
+  left: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--button-border) !important;
+  border-radius: 4px !important;
+  font-size: 1.5rem !important;
+  z-index: 999;
+}
+
+/* Options */
+.client-combobox > select.client-selector + .ts-wrapper .ts-dropdown .option {
+  padding: 10px;
+  cursor: pointer;
+}
+.client-combobox > select.client-selector + .ts-wrapper .ts-dropdown .option:hover,
+.client-combobox > select.client-selector + .ts-wrapper .ts-dropdown .option.selected {
+  background: #f5f5f5;
+}
+
+/* Texte d’aide */
+.staff-draft-order-wrapper .rte {
+  font-size: 16px;
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+/* Feedback */
+.staff-draft-order-wrapper .feedback {
+  font-size: 15px;
+  font-weight: bold;
+  margin-top: 5mm;
+}
+
+/* Bouton principal */
+.staff-draft-order-wrapper .staff-order-button {
+  width: 100%;
+  height: 44px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-border);
+  transition: background-color 0.2s ease;
+}
+.staff-draft-order-wrapper .staff-order-button:hover {
+  filter: brightness(0.95);
+}
+
+/* Texte sélectionné */
+.staff-draft-order-wrapper #selected-info {
+  font-size: 15px;
+  margin-top: 10px;
+  color: #222;
+}
+/* ===== STAFF DRAFT ORDER – ZYO Style ===== */
+
+/* … le reste de ton CSS … */
+
+/* ==== Arrow pour client-selector ==== */
+.staff-draft-order-wrapper
+  .client-combobox
+  .ts-wrapper.client-selector.single {
+  position: relative !important;
+}
+
+.staff-draft-order-wrapper
+  .client-combobox
+  .ts-wrapper.client-selector.single::after {
+  content: "▾";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: var(--button-border);
+  pointer-events: none;
+}
+/* petit carré ou icône devant "Order created" */
+.staff-draft-order-wrapper .order-created-icon {
+  display: inline-block;
+  margin-right: 0.5em;
+  font-size: 1em;
+}
