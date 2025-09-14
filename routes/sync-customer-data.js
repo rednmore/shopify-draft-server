@@ -217,6 +217,69 @@ router.post('/', async (req, res) => {
       }
     }
 
+
+    // ----------------------------------------------------
+    // 2.8 bis) [ADD] Métachamp custom.company_name (miroir du company) — Option B
+    // ----------------------------------------------------
+    // But : tenir aussi à jour la clé standardisée custom.company_name
+    if (customerNameMeta) {
+      try {
+        // Chercher s'il existe déjà
+        const mfGet2 = await axios.get(
+          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=company_name`,
+          {
+            headers: {
+              'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        const existing2 = (mfGet2.data.metafields || [])[0];
+
+        if (existing2 && existing2.id) {
+          // Update
+          await axios.put(
+            `${SHOPIFY_BASE}/metafields/${existing2.id}.json`,
+            {
+              metafield: {
+                id: existing2.id,
+                type: 'single_line_text_field',
+                value: customerNameMeta
+              }
+            },
+            {
+              headers: {
+                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        } else {
+          // Create
+          await axios.post(
+            `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
+            {
+              metafield: {
+                namespace: 'custom',
+                key: 'company_name',
+                type: 'single_line_text_field',
+                value: customerNameMeta
+              }
+            },
+            {
+              headers: {
+                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+      } catch (e) {
+        console.warn('⚠️ company_name metafield upsert failed:', e?.response?.data || e.message);
+      }
+    }
+
+    
     // ----------------------------------------------------
     // 2.9) Réponse OK
     // ----------------------------------------------------
