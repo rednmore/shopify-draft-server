@@ -182,51 +182,67 @@ app.get('/list-customers', async function(req, res) {
     })) {
     return res.status(403).json({ message: 'Origine non autorisée' });
   }
+
   try {
     var shopRes = await fetch(
       shopifyBaseUrl + '/customers.json?limit=100',
       {
-        headers: shopifyHeaders()
+        headers: {
+          'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+          'Content-Type': 'application/json'
+        }
       }
     );
     var data = await shopRes.json();
     if (!data.customers) {
       return res.status(500).json({ message: 'Aucun client trouvé', raw: data });
     }
+
     var clients = await Promise.all(
       data.customers.map(async function(c) {
         try {
           var detailRes = await fetch(
             shopifyBaseUrl + '/customers/' + c.id + '.json',
             {
-              headers: shopifyHeaders()
+              headers: {
+                'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
+                'Content-Type': 'application/json'
+              }
             }
           );
           var full = (await detailRes.json()).customer;
+
+          // --- Priorité à la société (changement minimal) ---
+          var companyFromDefault = full && full.default_address && full.default_address.company;
+          var companyFromFirst   = full && full.addresses && full.addresses[0] && full.addresses[0].company;
+          var company            = companyFromDefault || companyFromFirst;
+
           var label;
-          if (full.first_name || full.last_name) {
+          if (company) {
+            label = company; // société en premier
+          } else if (full.first_name || full.last_name) {
             label = ((full.first_name || '') + ' ' + (full.last_name || '')).trim();
-          } else if (full.default_address && full.default_address.company) {
-            label = full.default_address.company;
-          } else if (full.addresses && full.addresses[0] && full.addresses[0].company) {
-            label = full.addresses[0].company;
           } else if (full.email) {
             label = full.email;
           } else {
             label = 'Client ' + full.id;
           }
+          // --- fin changement ---
+
           return { id: full.id, label: label };
         } catch (_) {
           return { id: c.id, label: 'Client ' + c.id };
         }
       })
     );
+
     res.json(clients);
   } catch (err) {
     console.error("❌ Erreur /list-customers :", err.stack || err);
     res.status(500).json({ message: "Erreur serveur", detail: err.message, stack: err.stack });
   }
 });
+
 
 // =========================================
 /* 8.1. MONTAGE DES ROUTES DRAFT ORDERS
