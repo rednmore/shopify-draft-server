@@ -1,3 +1,6 @@
+// ========================================================
+// 1) IMPORTS & CONFIG
+// ========================================================
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
@@ -8,19 +11,25 @@ const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 // [CHANGED] Base Admin API (v2023-10) — évite d'appeler le domaine nu
 const SHOPIFY_BASE = `https://${SHOPIFY_API_URL}/admin/api/2023-10`;
 
+// ========================================================
+// 2) HANDLER WEBHOOK: POST / (customers.create / update)
+// ========================================================
 router.post('/', async (req, res) => {
+  // 2.1) Ping simple si payload vide
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(200).json({ message: 'Webhook OK (ping)' });
   }
 
+  // 2.2) Récup ID client
   const customerId = req.body.id;
-
   if (!customerId) {
     return res.status(400).json({ error: 'Missing customer ID' });
   }
 
   try {
-    // 🔍 Récupérer les infos complètes du client
+    // ----------------------------------------------------
+    // 2.3) Lecture du client complet
+    // ----------------------------------------------------
     const { data: { customer } } = await axios.get(
       // [CHANGED] URL corrigée
       `${SHOPIFY_BASE}/customers/${customerId}.json`,
@@ -36,7 +45,9 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
-    // 📦 Lire le champ note (contenant un JSON)
+    // ----------------------------------------------------
+    // 2.4) Parsing de la note JSON (source des champs)
+    // ----------------------------------------------------
     let noteData = {};
     try {
       if (customer.note) {
@@ -55,13 +66,15 @@ router.post('/', async (req, res) => {
     const city     = clean(noteData.city);
     const vat      = clean(noteData.vat_number);
 
-    // 🛑 Rien à faire si aucun champ pertinent
+    // 2.5) Rien à faire si aucun champ pertinent
     if (!company && !address1 && !vat) {
       console.log('ℹ️ Aucun champ utile trouvé dans la note. Fin du traitement.');
       return res.status(200).json({ message: 'Nothing to update' });
     }
 
-    // 🏢 Création ou mise à jour de l'adresse client
+    // ----------------------------------------------------
+    // 2.6) Création / Mise à jour de l'adresse (inclut company)
+    // ----------------------------------------------------
     const addressPayload = {
       company,
       address1: address1 || 'To complete',
@@ -98,7 +111,9 @@ router.post('/', async (req, res) => {
       );
     }
 
-    // 🔐 Ajout du champ TVA en tant que metafield
+    // ----------------------------------------------------
+    // 2.7) Métachamp TVA + Tag TVA
+    // ----------------------------------------------------
     if (vat) {
       console.log('➕ Ajout TVA en metafield');
       await axios.post(
@@ -139,11 +154,83 @@ router.post('/', async (req, res) => {
       );
     }
 
+    // ----------------------------------------------------
+    // 2.8) [ADD] Métachamp custom.customer_name (miroir du company)
+    // ----------------------------------------------------
+    // But : disposer dans l'Admin (section Métadonnées client) d’un champ "Customer name"
+    //       alimenté automatiquement depuis la note (company/company_name)
+    const customerNameMeta = company || undefined;
+    if (customerNameMeta) {
+      try {
+        // Chercher s'il existe déjà
+        const mfGet = await axios.get(
+          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=customer_name`,
+          {
+            headers: {
+              'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        const existing = (mfGet.data.metafields || [])[0];
+
+        if (existing && existing.id) {
+          // Update
+          await axios.put(
+            `${SHOPIFY_BASE}/metafields/${existing.id}.json`,
+            {
+              metafield: {
+                id: existing.id,
+                type: 'single_line_text_field',
+                value: customerNameMeta
+              }
+            },
+            {
+              headers: {
+                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        } else {
+          // Create
+          await axios.post(
+            `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
+            {
+              metafield: {
+                namespace: 'custom',
+                key: 'customer_name',
+                type: 'single_line_text_field',
+                value: customerNameMeta
+              }
+            },
+            {
+              headers: {
+                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+      } catch (e) {
+        console.warn('⚠️ customer_name metafield upsert failed:', e?.response?.data || e.message);
+      }
+    }
+
+    // ----------------------------------------------------
+    // 2.9) Réponse OK
+    // ----------------------------------------------------
     res.status(200).json({ success: true });
   } catch (err) {
+    // ----------------------------------------------------
+    // 2.10) Gestion d’erreur
+    // ----------------------------------------------------
     console.error('❌ Erreur sync-customer-data :', err.response?.data || err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
+// ========================================================
+// 3) EXPORT ROUTER
+// ========================================================
 module.exports = router;
