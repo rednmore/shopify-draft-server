@@ -56,48 +56,6 @@
 
     {{- 'theme.css' | asset_url | stylesheet_tag: preload: true -}}
 
-    {%- comment -%} =========================
-       EmailJS SDK — init + fallback
-       ========================= {%- endcomment -%}
-    <script>
-      window.__EMAILJS_PUBLIC_KEY = '3Z2kNfwFGAthM7GYS';
-      window.__emailjs_ready = false;
-
-      (function () {
-        function initEmailJS(){
-          if (window.__emailjs_ready) return;
-          if (window.emailjs && typeof window.emailjs.init === 'function') {
-            try {
-              window.emailjs.init({ publicKey: window.__EMAILJS_PUBLIC_KEY });
-              window.__emailjs_ready = true;
-              console.debug('[EmailJS] initialized');
-            } catch (e) {
-              console.warn('[EmailJS] init failed', e);
-            }
-          }
-        }
-
-        // 1) tenter l’asset local
-        var local = document.createElement('script');
-        local.src = "{{ 'email.min.js' | asset_url }}";
-        local.defer = true;
-        local.onload = initEmailJS;
-        local.onerror = function(){
-          console.warn('[EmailJS] Local load failed, fallback to CDN');
-          var cdn = document.createElement('script');
-          cdn.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
-          cdn.defer = true;
-          cdn.onload = initEmailJS;
-          cdn.onerror = function(){ console.error('[EmailJS] CDN load failed'); };
-          document.head.appendChild(cdn);
-        };
-        document.head.appendChild(local);
-
-        // filet de sécurité
-        document.addEventListener('DOMContentLoaded', function(){ setTimeout(initEmailJS, 0); });
-      })();
-    </script>
-
     {%- comment -%}
       reCAPTCHA v2 n’est plus chargé globalement ici.
       Il sera injecté uniquement dans la section RegPro (main-register-advanced.liquid).
@@ -121,7 +79,7 @@
     <loading-bar class="loading-bar" aria-hidden="true"></loading-bar>
     <a href="#main" allow-hash-change class="skip-to-content sr-only">{{ 'general.accessibility.skip_to_content' | t }}</a>
 
-    <span id="header-scroll-tracker" style="position: absolute; width: 1px, height: 1px; top: var(--header-scroll-tracker-offset, 10px); left: 0;">
+    <span id="header-scroll-tracker" style="position: absolute; width: 1px; height: 1px; top: var(--header-scroll-tracker-offset, 10px); left: 0;">
       {%- comment -%}
         This allows our theme to track when the user has scrolled a given amount of pixels, without relying on a global scroll listener. This helps
         to improve performance and reduce reflows.
