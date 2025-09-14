@@ -1,45 +1,41 @@
 // assets/staff-draft-order.js
-console.log('🚀 staff-draft-order.js chargé et exécuté');
-document.addEventListener("DOMContentLoaded", async () => {
-   console.log('📑 DOMContentLoaded fired');
+console.log('🚀 staff-draft-order.js chargé');
+
+(() => {
   // ──────────────────────────────────────────────────
   // CHAPITRE 0 — CONSTANTES GLOBALES
   // ──────────────────────────────────────────────────
-  const BASE_URL       = "https://shopify-test-server-05d9.onrender.com";
-  const API_KEY        = "MacleDo1tRSTHEZ1298";
-  const EXPIRY_MS      = 24 * 60 * 60 * 1000; // 24h
+  const BASE_URL  = "https://shopify-test-server-05d9.onrender.com";
+  const API_KEY   = "MacleDo1tRSTHEZ1298";
+  const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24h
 
   // ──────────────────────────────────────────────────
-  // CHAPITRE 1 — CHARGEMENT UNIQUE DE TOUS LES CLIENTS
+  // UTILITAIRES — INIT ROBUSTE
   // ──────────────────────────────────────────────────
-  let allCustomers = [];
-  try {
-    const res  = await fetch(`${BASE_URL}/list-customers?key=${encodeURIComponent(API_KEY)}`, { mode: "cors" });
-    const data = await res.json();
-    if (!Array.isArray(data)) throw new Error("Invalid clients data");
-    allCustomers = data.map(c => ({ id: c.id, text: c.label }));
-    console.log('🚀 allCustomers:', allCustomers);
-  } catch (err) {
-    document
-      .querySelectorAll(".staff-draft-order-section .feedback")
-      .forEach(el => el.textContent = "❌ Impossible de charger les clients.");
-    return;
-  }
 
-  // ──────────────────────────────────────────────────
-  // CHAPITRE 2 — INITIALISATION PAR SECTION
-  // ──────────────────────────────────────────────────
-  document.querySelectorAll(".staff-draft-order-section").forEach(section => {
-    // 2.0 — Variables spécifiques à la section
+  /**
+   * Initialise la combobox + toute la logique de la section passée.
+   * Idempotent : détruit l'instance TomSelect existante si nécessaire.
+   */
+  function initStaffSelectorInSection(section, allCustomers) {
+    if (!section || !section.matches('.staff-draft-order-section')) return;
+
     const sectionId      = section.dataset.sectionId;
     if (!sectionId) return;
 
     const lsKey          = `staffDraftOrder:${sectionId}`;
     const lsCustomerKey  = `staffDraftOrder:selected:${sectionId}`;
+
     const selectEl       = section.querySelector("select.client-selector");
     const feedbackEl     = section.querySelector(".feedback");
     const createBtn      = section.querySelector("button.staff-order-button");
-    // renommer pour éviter toute confusion
+
+    if (!selectEl || !feedbackEl || !createBtn) {
+      console.warn('[staff-draft-order] Eléments manquants dans la section', { selectEl, feedbackEl, createBtn });
+      return;
+    }
+
+    // Définition visible du bouton (comme avant)
     createBtn.textContent = "Create Draft Order";
 
     const placeholderText  = section.dataset.placeholder              || "Search for opticians…";
@@ -50,11 +46,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sendErrorText    = section.dataset.sendErrorText            || "Error, retry";
     const sentText         = section.dataset.sentText                 || "Sent!";
 
+    // État local à la section
     let selectedCustomerId = null;
     let confirmBtn         = null;
 
     // ──────────────────────────────────────────────────
-    // 2.1 — Fonction : afficher “Confirm & Send Order”
+    // Fonction UI : bouton “Confirm & Send Order”
     // ──────────────────────────────────────────────────
     function renderConfirmButton(invoiceUrl, draftId) {
       // masquer “Create Draft Order”
@@ -69,7 +66,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       confirmBtn.style.color           = createBtn.style.color;
       feedbackEl.appendChild(confirmBtn);
 
-      // 1er clic : compléter + envoyer l’email
       const onConfirm = async () => {
         confirmBtn.disabled    = true;
         confirmBtn.textContent = sendingText;
@@ -86,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
           const completeData = await completeRes.json();
           if (!completeRes.ok) throw completeData;
-          const orderId = completeData.order_id || completeData.order.id;
+          const orderId = completeData.order_id || (completeData.order && completeData.order.id);
 
           // 2) Envoyer la confirmation de commande par email
           const sendRes = await fetch(
@@ -107,6 +103,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           // 3) Passer en mode “Sent! → Click for new order”
           confirmBtn.disabled    = false;
           confirmBtn.textContent = `${sentText} → Click for new order`;
+
           // marquer en localStorage que c'est finalisé
           localStorage.setItem(lsKey, JSON.stringify({
             ts: Date.now(),
@@ -135,9 +132,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // ──────────────────────────────────────────────────
-    // 2.2 — Restauration d’un draft non validé ou finalisé
+    // Restauration d’un draft (avant init TomSelect) — logique inchangée
     // ──────────────────────────────────────────────────
-    ;(async () => {
+    (async () => {
       try {
         const raw = localStorage.getItem(lsKey);
         if (!raw) return;
@@ -170,17 +167,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     })();
 
     // ──────────────────────────────────────────────────
-    // 2.3 — INITIALISATION TomSelect
+    // INITIALISATION TomSelect — avec gardes + idempotence
     // ──────────────────────────────────────────────────
     console.log('🚀 allCustomers passed to TomSelect:', allCustomers);
-    console.log('→ typeof TomSelect:', typeof TomSelect);
-    console.log('→ selectEl (should be <select>):', selectEl);
+    if (selectEl.tomselect) {
+      try { selectEl.tomselect.destroy(); } catch(_) {}
+    }
+
+    if (typeof TomSelect === 'undefined') {
+      console.error('❌ TomSelect non défini — vérifier le chargement de tom-select.complete.min.js');
+      feedbackEl.textContent = '❌ Erreur de chargement Tom Select.';
+      return;
+    }
 
     const ts = new TomSelect(selectEl, {
       valueField:       "id",
       labelField:       "text",
       searchField:      ["text"],
-      options:          allCustomers,
+      options:          Array.isArray(allCustomers) ? allCustomers : [],
       placeholder:      placeholderText,
       maxOptions:       8,
       preload:          true,
@@ -219,9 +223,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     // ──────────────────────────────────────────────────
-    // 2.4 — Restaurer draft APRÈS TomSelect si panier inchangé
+    // Restauration (après init TomSelect) — logique inchangée
     // ──────────────────────────────────────────────────
-    ;(async () => {
+    (async () => {
       try {
         const raw = localStorage.getItem(lsKey);
         if (!raw) return;
@@ -242,7 +246,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     })();
 
     // ──────────────────────────────────────────────────
-    // 2.5 — Clic sur “Create Draft Order” ou mise à jour si existant
+    // Clic sur “Create Draft Order” — logique inchangée
     // ──────────────────────────────────────────────────
     createBtn.addEventListener("click", async () => {
       if (!selectedCustomerId) {
@@ -300,7 +304,59 @@ document.addEventListener("DOMContentLoaded", async () => {
         createBtn.style.display = "";
       }
     });
+  }
 
-  }); // forEach section
+  /**
+   * Initialise toutes les sections présentes dans la page.
+   */
+  function initAllStaffSelectors(allCustomers) {
+    document.querySelectorAll(".staff-draft-order-section")
+      .forEach(section => initStaffSelectorInSection(section, allCustomers));
+  }
 
-}); // DOMContentLoaded
+  // ──────────────────────────────────────────────────
+  // BOOTSTRAP — charge la liste clients puis initialise proprement
+  // ──────────────────────────────────────────────────
+  async function bootstrap() {
+    console.log('📑 bootstrap start');
+
+    // CHAPITRE 1 — CHARGEMENT UNIQUE DE TOUS LES CLIENTS
+    let allCustomers = [];
+    try {
+      const res  = await fetch(`${BASE_URL}/list-customers?key=${encodeURIComponent(API_KEY)}`, { mode: "cors" });
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("Invalid clients data");
+      allCustomers = data.map(c => ({ id: c.id, text: c.label }));
+      console.log('🚀 allCustomers:', allCustomers);
+    } catch (err) {
+      console.error('❌ Impossible de charger les clients :', err);
+      // Mode dégradé : on continue l'init (options vides) pour que la combobox s'affiche quand même
+      document
+        .querySelectorAll(".staff-draft-order-section .feedback")
+        .forEach(el => el.textContent = "❌ Clients non chargés (mode dégradé).");
+    }
+
+    // Initialisation immédiate / ou au DOM ready
+    const startInit = () => initAllStaffSelectors(allCustomers);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startInit, { once: true });
+    } else {
+      startInit();
+    }
+
+    // Re-init quand l’éditeur recharge une section
+    document.addEventListener('shopify:section:load', (e) => {
+      if (e.target && e.target.matches('.staff-draft-order-section')) {
+        initStaffSelectorInSection(e.target, allCustomers);
+      }
+    });
+
+    // Optionnel : re-init après réordonnancement
+    document.addEventListener('shopify:section:reorder', () => {
+      initAllStaffSelectors(allCustomers);
+    });
+  }
+
+  // Lance le bootstrap
+  bootstrap();
+})();
