@@ -23,7 +23,6 @@ process.on('unhandledRejection', (reason, p) => {
   console.error('❌ UnhandledRejection at:', p, 'reason:', reason);
 });
 
-
 function mask(v) {
   if (!v) return v;
   if (v.length <= 8) return '********';
@@ -118,7 +117,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', reqAllowed);
   } else {
     // Par défaut, les plus courants
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Idempotency-Key');
   }
 
   // Si vous utilisez des cookies/Authorization côté client, décommentez :
@@ -162,6 +161,43 @@ const orderLimiter = rateLimit({
   max: 10,
   message: { message: 'Trop de créations de commande. Veuillez patienter.' }
 });
+// =========================================
+/* 6.b. LIMITEUR POUR CREATE CUSTOMER */
+// =========================================
+const createCustomerLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,  // 10 minutes
+  max: 20,                   // 20 créations max / 10 min / IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Trop de créations de client. Veuillez patienter.' }
+});
+
+// =========================================
+/* 6.c. IDEMPOTENCE EN MÉMOIRE (10 min) */
+// =========================================
+const idemCache = new Map(); // key -> { ts, response }
+const IDEM_TTL_MS = 10 * 60 * 1000;
+function getIdem(key) {
+  if (!key) return null;
+  const val = idemCache.get(key);
+  if (!val) return null;
+  if (Date.now() - val.ts > IDEM_TTL_MS) {
+    idemCache.delete(key);
+    return null;
+  }
+  return val.response;
+}
+function setIdem(key, response) {
+  if (!key) return;
+  idemCache.set(key, { ts: Date.now(), response });
+}
+// (petit garbage collector)
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of idemCache.entries()) {
+    if (now - v.ts > IDEM_TTL_MS) idemCache.delete(k);
+  }
+}, 5 * 60 * 1000);
 
 // =========================================
 /* 7. ROUTE GET : /list-customers
@@ -243,6 +279,175 @@ app.get('/list-customers', async function(req, res) {
   }
 });
 
+// =========================================
+/* 7.b. ROUTE POST : /create-customer
+      Crée un client + adresse par défaut + métachamps (company mirror)
+      + Unicité email + Idempotency-Key (10 min) */
+// =========================================
+app.post('/create-customer', createCustomerLimiter, async (req, res) => {
+  try {
+    // Auth par clé partagée (même logique que /list-customers)
+    const clientKey = req.headers['x-api-key'] || req.query.key;
+    if (!clientKey || clientKey !== process.env.API_SECRET) {
+      return res.status(403).json({ message: 'Clé API invalide' });
+    }
+
+    // Origine autorisée (même logique que /list-customers)
+    const origin = req.get('origin');
+    const isAllowedOrigin = !!origin && ALLOWED_ORIGINS.some(o => (
+      typeof o === 'string' ? o === origin : (o instanceof RegExp ? o.test(origin) : false)
+    ));
+    if (origin && !isAllowedOrigin) {
+      return res.status(403).json({ message: 'Origine non autorisée' });
+    }
+
+    // Idempotency-Key
+    const idemKey = req.headers['idempotency-key'];
+    const cached = getIdem(idemKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
+    const {
+      email, first_name, last_name, phone, note, tags = [],
+      default_address = {},
+      metafields = []
+    } = req.body || {};
+
+    // Validation minimale (champs obligatoires)
+    if (!email || !first_name || !last_name) {
+      return res.status(400).json({ message: 'Champs obligatoires manquants (email, first_name, last_name)' });
+    }
+    if (!default_address || !default_address.address1 || !default_address.zip || !default_address.city || !default_address.country_code || !default_address.company) {
+      return res.status(400).json({ message: 'Adresse par défaut incomplète (address1, zip, city, country_code, company requis)' });
+    }
+
+    // 0) Unicité email : search avant création
+    const q = encodeURIComponent(`email:${email}`);
+    let rSearch = await fetch(`${shopifyBaseUrl}/customers/search.json?query=${q}`, { headers: shopifyHeaders() });
+    let jSearch = await rSearch.json().catch(()=>({}));
+    const existing = Array.isArray(jSearch?.customers) ? jSearch.customers[0] : null;
+    if (existing?.id) {
+      const resp = { message: 'Customer already exists', id: existing.id, customer: existing, exists: true };
+      setIdem(idemKey, resp);
+      return res.status(409).json(resp);
+    }
+
+    // 1) Création du client (Admin REST)
+    const createPayload = {
+      customer: {
+        email,
+        first_name,
+        last_name,
+        phone: phone || null,
+        note: note || null,
+        tags: Array.isArray(tags) ? tags.join(',') : String(tags || ''),
+        addresses: [ default_address ],
+        verified_email: true
+      }
+    };
+
+    let r = await fetch(`${shopifyBaseUrl}/customers.json`, {
+      method: 'POST',
+      headers: shopifyHeaders(),
+      body: JSON.stringify(createPayload)
+    });
+    let j = await r.json().catch(()=>({}));
+    if (!r.ok || !j?.customer?.id) {
+      return res.status(r.status || 500).json({ message: 'Échec création client', errors: j?.errors || j });
+    }
+    const customer = j.customer;
+
+    // 2) Écrire les métachamps (miroir company + TVA éventuelle)
+    if (Array.isArray(metafields) && metafields.length) {
+      for (const mf of metafields) {
+        try {
+          const body = { metafield: mf };
+          const mRes = await fetch(`${shopifyBaseUrl}/customers/${customer.id}/metafields.json`, {
+            method: 'POST',
+            headers: shopifyHeaders(),
+            body: JSON.stringify(body)
+          });
+          if (!mRes.ok) {
+            const mt = await mRes.text().catch(()=> '');
+            console.warn('⚠️ Metafield creation failed:', mRes.status, mt);
+          }
+        } catch (e) {
+          console.warn('⚠️ Metafield exception:', e?.message || e);
+        }
+      }
+    } else {
+      // a minima, garder un miroir company_name
+      const companyName = default_address.company || '';
+      if (companyName) {
+        try {
+          const body = { metafield: {
+            namespace: 'custom',
+            key: 'company_name',
+            type: 'single_line_text_field',
+            value: companyName
+          }};
+          await fetch(`${shopifyBaseUrl}/customers/${customer.id}/metafields.json`, {
+            method: 'POST',
+            headers: shopifyHeaders(),
+            body: JSON.stringify(body)
+          });
+        } catch(e) {
+          console.warn('⚠️ Metafield company_name failed:', e?.message || e);
+        }
+      }
+      // TVA optionnelle (si vous envoyez "vat_number" en front)
+      const mfVat = metafields.find(m => m.key === 'vat_number');
+      if (!mfVat && (req.body?.vat_number || '').trim()) {
+        try {
+          const body = { metafield: {
+            namespace: 'custom',
+            key: 'vat_number',
+            type: 'single_line_text_field',
+            value: String(req.body.vat_number).trim()
+          }};
+          await fetch(`${shopifyBaseUrl}/customers/${customer.id}/metafields.json`, {
+            method: 'POST',
+            headers: shopifyHeaders(),
+            body: JSON.stringify(body)
+          });
+        } catch(e) {
+          console.warn('⚠️ Metafield vat_number failed:', e?.message || e);
+        }
+      }
+    }
+
+    // 3) S’assurer que l’adresse par défaut est bien déclarée par Shopify
+    try {
+      const addrRes = await fetch(`${shopifyBaseUrl}/customers/${customer.id}/addresses.json`, {
+        headers: shopifyHeaders()
+      });
+      const addrJson = await addrRes.json().catch(()=>({}));
+      const firstAddr = Array.isArray(addrJson?.addresses) ? addrJson.addresses[0] : null;
+      if (firstAddr?.id && !firstAddr?.default) {
+        const defRes = await fetch(`${shopifyBaseUrl}/customers/${customer.id}/addresses/${firstAddr.id}/default.json`, {
+          method: 'PUT',
+          headers: shopifyHeaders()
+        });
+        if (!defRes.ok) {
+          const dt = await defRes.text().catch(()=> '');
+          console.warn('⚠️ set default address failed:', defRes.status, dt);
+        }
+      }
+    } catch(e) {
+      console.warn('⚠️ ensure default address failed:', e?.message || e);
+    }
+
+    const resp = { id: customer.id, customer };
+    setIdem(idemKey, resp);
+    return res.json(resp);
+  } catch (err) {
+    console.error('❌ /create-customer error:', err?.response?.data || err.message || err);
+    return res.status(err?.response?.status || 500).json({
+      message: err?.response?.data?.errors || err.message || 'Server error'
+    });
+  }
+});
 
 // =========================================
 /* 8.1. MONTAGE DES ROUTES DRAFT ORDERS
