@@ -5,6 +5,9 @@ const router = express.Router();
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 
+// [CHANGED] Base Admin API (v2023-10) — évite d'appeler le domaine nu
+const SHOPIFY_BASE = `https://${SHOPIFY_API_URL}/admin/api/2023-10`;
+
 router.post('/', async (req, res) => {
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(200).json({ message: 'Webhook OK (ping)' });
@@ -19,7 +22,8 @@ router.post('/', async (req, res) => {
   try {
     // 🔍 Récupérer les infos complètes du client
     const { data: { customer } } = await axios.get(
-      `${SHOPIFY_API_URL}/customers/${customerId}.json`,
+      // [CHANGED] URL corrigée
+      `${SHOPIFY_BASE}/customers/${customerId}.json`,
       {
         headers: {
           'X-Shopify-Access-Token': SHOPIFY_API_KEY,
@@ -44,7 +48,8 @@ router.post('/', async (req, res) => {
 
     const clean = (v) => typeof v === 'string' ? v.trim() : undefined;
 
-    const company  = clean(noteData.company);
+    // [CHANGED] Fallback sur company_name si company est absent
+    const company  = clean(noteData.company) || clean(noteData.company_name);
     const address1 = clean(noteData.address1);
     const zip      = clean(noteData.zip);
     const city     = clean(noteData.city);
@@ -68,7 +73,8 @@ router.post('/', async (req, res) => {
     if (!customer.default_address) {
       console.log('➕ Création d’une adresse client');
       await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/addresses.json`,
+        // [CHANGED] URL corrigée
+        `${SHOPIFY_BASE}/customers/${customerId}/addresses.json`,
         { address: addressPayload },
         {
           headers: {
@@ -80,7 +86,8 @@ router.post('/', async (req, res) => {
     } else {
       console.log('✏️ Mise à jour de l’adresse existante');
       await axios.put(
-        `${SHOPIFY_API_URL}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
+        // [CHANGED] URL corrigée
+        `${SHOPIFY_BASE}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
         { address: addressPayload },
         {
           headers: {
@@ -95,7 +102,8 @@ router.post('/', async (req, res) => {
     if (vat) {
       console.log('➕ Ajout TVA en metafield');
       await axios.post(
-        `${SHOPIFY_API_URL}/customers/${customerId}/metafields.json`,
+        // [CHANGED] URL corrigée
+        `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
         {
           metafield: {
             namespace: 'custom',
@@ -116,14 +124,19 @@ router.post('/', async (req, res) => {
       const existingTags = customer.tags?.split(',').map(t => t.trim()) || [];
       const newTags = [...new Set([...existingTags, `TVA:${vat}`])];
 
-      await axios.put(`${SHOPIFY_API_URL}/customers/${customerId}.json`, {
-        customer: { id: customerId, tags: newTags.join(', ') }
-      }, {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-          'Content-Type': 'application/json'
+      await axios.put(
+        // [CHANGED] URL corrigée
+        `${SHOPIFY_BASE}/customers/${customerId}.json`,
+        {
+          customer: { id: customerId, tags: newTags.join(', ') }
+        },
+        {
+          headers: {
+            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
     }
 
     res.status(200).json({ success: true });
