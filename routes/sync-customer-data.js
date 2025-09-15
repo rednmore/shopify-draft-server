@@ -401,6 +401,17 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Debug: voir si le serveur reçoit quelque chose
+router.get('/_ping', (req, res) => {
+  res.json({ ok: true, now: new Date().toISOString() });
+});
+
+// Debug: inspecter les derniers webhooks reçus
+router.get('/_last', (req, res) => {
+  res.json({ count: recentWebhookHits.length, items: recentWebhookHits });
+});
+
+
 // ========================================================
 // 3) EXPORT ROUTER
 // ========================================================
