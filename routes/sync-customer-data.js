@@ -11,15 +11,29 @@ const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 // [CHANGED] Base Admin API (v2023-10) — évite d'appeler le domaine nu
 const SHOPIFY_BASE = `https://${SHOPIFY_API_URL}/admin/api/2023-10`;
 
+const recentWebhookHits = []; // petit buffer en mémoire (dernier 20)
+const MAX_RECENT = 20;
+
 // ========================================================
 // 2) HANDLER WEBHOOK: POST / (customers.create / update)
 // ========================================================
 router.post('/', async (req, res) => {
+  try {
+    recentWebhookHits.unshift({
+      ts: new Date().toISOString(),
+      topic: req.get('X-Shopify-Topic') || '(none)',
+      shop: req.get('X-Shopify-Shop-Domain') || '(none)',
+      hmac: req.get('X-Shopify-Hmac-Sha256') ? 'present' : 'missing',
+      body: req.body
+    });
+    if (recentWebhookHits.length > MAX_RECENT) recentWebhookHits.pop();
+  } catch (_) {}
+  
   // 2.1) Ping simple si payload vide
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(200).json({ message: 'Webhook OK (ping)' });
   }
-
+});
   // 2.2) Récup ID client
   const customerId = req.body.id;
   if (!customerId) {
