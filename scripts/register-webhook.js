@@ -2,7 +2,7 @@
 require('dotenv').config();
 
 /**
- * Enregistrement (idempotent) du webhook "customers/create"
+ * Enregistrement (idempotent) des webhooks "customers/create" et "customers/update"
  * Utilise fetch natif (Node >=18), donc aucune dépendance axios.
  */
 
@@ -14,7 +14,7 @@ const WEBHOOK_ADDRESS =
 const API_VERSION = '2023-10';
 
 if (!SHOP || !API_KEY) {
-  console.error('❌ register-webhook: SHOPIFY_API_URL ou SHOPIFY_API_KEY manquant — on ignore l’installation du webhook.');
+  console.error('❌ register-webhook: SHOPIFY_API_URL ou SHOPIFY_API_KEY manquant — on ignore l’installation des webhooks.');
   return; // ne pas process.exit() pour ne pas planter le serveur si ce fichier est require() au démarrage
 }
 
@@ -62,46 +62,57 @@ async function safeText(res) {
   try { return await res.text(); } catch { return ''; }
 }
 
-async function registerCustomerCreateWebhook() {
-  try {
-    // 1) Lister les webhooks existants
-    const listData = await httpGet(`${baseUrl}/webhooks.json`);
-    const hooks = listData.webhooks || [];
+/**
+ * Enregistre un webhook (idempotent) pour un topic donné sur l’adresse WEBHOOK_ADDRESS
+ */
+async function ensureWebhook(topic) {
+  // 1) Lister les webhooks existants
+  const listData = await httpGet(`${baseUrl}/webhooks.json`);
+  const hooks = listData.webhooks || [];
 
-    const exists = hooks.find(
-      (w) => w.topic === 'customers/create' && w.address === WEBHOOK_ADDRESS
-    );
+  const exists = hooks.find(
+    (w) => w.topic === topic && w.address === WEBHOOK_ADDRESS
+  );
 
-    if (exists) {
-      console.log(`⚠️ Webhook déjà présent (id=${exists.id}). On ne crée rien.`);
-      return;
+  if (exists) {
+    console.log(`⚠️ Webhook déjà présent pour "${topic}" (id=${exists.id}). On ne crée rien.`);
+    return;
+  }
+
+  // 2) Créer le webhook s’il n’existe pas
+  const payload = {
+    webhook: {
+      topic,
+      address: WEBHOOK_ADDRESS,
+      format: 'json'
     }
+  };
 
-    // 2) Créer le webhook s’il n’existe pas
-    const payload = {
-      webhook: {
-        topic: 'customers/create',
-        address: WEBHOOK_ADDRESS,
-        format: 'json'
-      }
-    };
+  const createData = await httpPost(`${baseUrl}/webhooks.json`, payload);
+  console.log(`✅ Webhook "${topic}" créé avec succès (id=${createData.webhook?.id})`);
+}
 
-    const createData = await httpPost(`${baseUrl}/webhooks.json`, payload);
-    console.log('✅ Webhook créé avec succès (id=', createData.webhook?.id, ')');
+/**
+ * Enregistre les webhooks nécessaires
+ */
+async function registerCustomerWebhooks() {
+  try {
+    await ensureWebhook('customers/create');
+    await ensureWebhook('customers/update'); // ← ajouté pour la synchro des changements d’adresse/company
   } catch (err) {
     // Cas fréquents : DNS / Shop injoignable / 422 "already exists"
     if (err.code === 'ENOTFOUND') {
-      console.warn('⚠️ DNS lookup failed pour', SHOP, '- webhook non installé.');
+      console.warn('⚠️ DNS lookup failed pour', SHOP, '- webhooks non installés.');
       return;
     }
     if (err.status === 422) {
       console.warn('⚠️ Webhook probablement déjà existant (422 Unprocessable Entity).');
       return;
     }
-    console.error('❌ Erreur inattendue lors de l’enregistrement du webhook :', err.message || err);
+    console.error('❌ Erreur inattendue lors de l’enregistrement des webhooks :', err.message || err);
     if (err.status) console.error('   Status:', err.status);
     if (err.body)   console.error('   Body  :', err.body);
   }
 }
 
-registerCustomerCreateWebhook();
+registerCustomerWebhooks();
