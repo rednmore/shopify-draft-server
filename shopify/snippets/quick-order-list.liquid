@@ -28,13 +28,7 @@
       method="post"
       id="QuickOrderList"
     >
-{%- assign per_page = section.settings.variants_per_page -%}
-{%- if is_modal -%}
-  {%- assign per_page = product.variants_count -%}
-{%- endif -%}
-
-
-      {% paginate product.variants by per_page %}
+      {% paginate product.variants by section.settings.variants_per_page %}
         <div class="quick-order-list__container" id="main-variant-items">
           <table class="quick-order-list__table">
             <caption class="visually-hidden">
@@ -90,29 +84,18 @@
                   is_modal: is_modal
                 -%}
               {%- else -%}
-  {%- assign colors = product.variants | map: 'option1' | uniq -%}
-  {%- for color in colors -%}
-    {%- if color != blank -%}
-      <tr class="qol-color-heading">
-        <td class="h5" colspan="5">{{ color | escape }}</td>
-      </tr>
-    {%- endif -%}
-    {%- for variant in product.variants -%}
-      {%- if variant.option1 == color -%}
-        {%- render 'quick-order-list-row',
-          item: variant,
-          image: variant.image,
-          sku: variant.sku,
-          variant: variant,
-          show_image: show_image,
-          show_sku: show_sku,
-          is_modal: is_modal
-        -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endfor -%}
-{%- endif -%}
-
+                {%- for variant in product.variants -%}
+                  {%- render 'quick-order-list-row',
+                    item: variant,
+                    image: variant.image,
+                    sku: variant.sku,
+                    variant: variant,
+                    show_image: show_image,
+                    show_sku: show_sku,
+                    is_modal: is_modal
+                  -%}
+                {%- endfor -%}
+              {%- endif -%}
             </tbody>
           </table>
         </div>
@@ -150,23 +133,12 @@
         <div class="quick-order-list-total__info">
           <div class="quick-order-list-total__column small-hide medium-hide">
             <div class="quick-order-list-buttons">
-              <button
-  type="button"
-  class="quick-order-list__button button button--primary small-hide medium-hide qol-validate"
-  data-product-id="{{ product.id }}"
->
-  {{ 'products.product.add_to_cart' | t | default: 'Valider' }}
-</button>
-
-<button
-  type="button"
-  class="button button--tertiary small-hide medium-hide qol-cancel"
-  data-product-id="{{ product.id }}"
-  {% if is_modal %}data-action="close"{% endif %}
->
-  {{ 'sections.quick_order_list.cancel' | t | default: 'Cancel' }}
-</button>
-
+              <a
+                href="{{ routes.cart_url }} "
+                class="quick-order-list__button button button--secondary small-hide  medium-hide"
+              >
+                <span class="quick-order-list__button-text">{{- 'sections.quick_order_list.view_cart' | t -}}</span>
+              </a>
               <div class="variant-remove-total{% if items_in_cart == 0 %} variant-remove-total--empty{% endif %}">
                 {%- render 'loading-spinner' -%}
                 <quick-order-list-remove-all-button
@@ -252,23 +224,12 @@
           </div>
           <div class="quick-order-list-total__column large-up-hide">
             <div class="quick-order-list-buttons">
-             <button
-  type="button"
-  class="quick-order-list__button button button--primary button--full-width qol-validate"
-  data-product-id="{{ product.id }}"
->
-  {{ 'products.product.add_to_cart' | t | default: 'Valider' }}
-</button>
-
-<button
-  type="button"
-  class="button button--tertiary button--full-width qol-cancel"
-  data-product-id="{{ product.id }}"
-  {% if is_modal %}data-action="close"{% endif %}
->
-  {{ 'sections.quick_order_list.cancel' | t | default: 'Cancel' }}
-</button>
-
+              <a
+                href="{{ routes.cart_url }}"
+                class="quick-order-list__button button button--secondary button--full-width"
+              >
+                <span class="quick-order-list__button-text">{{- 'sections.quick_order_list.view_cart' | t -}}</span>
+              </a>
               <div class="variant-remove-total">
                 {%- render 'loading-spinner' -%}
                 <quick-order-list-remove-all-button
