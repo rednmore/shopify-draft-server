@@ -1,3 +1,4 @@
+// routes/sync-customer-data.js
 // ========================================================
 // 1) IMPORTS & CONFIG
 // ========================================================
@@ -8,16 +9,17 @@ const router = express.Router();
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL;
 
-// [CHANGED] Base Admin API (v2023-10) — évite d'appeler le domaine nu
+// Base Admin API (v2023-10)
 const SHOPIFY_BASE = `https://${SHOPIFY_API_URL}/admin/api/2023-10`;
 
 const recentWebhookHits = []; // petit buffer en mémoire (dernier 20)
 const MAX_RECENT = 20;
 
 // ========================================================
-// 2) HANDLER WEBHOOK: POST / (customers.create / update)
+// 2) HANDLER WEBHOOK: POST / (customers.create / customers.update)
 // ========================================================
 router.post('/', async (req, res) => {
+  // mini log mémoire (debug)
   try {
     recentWebhookHits.unshift({
       ts: new Date().toISOString(),
@@ -28,12 +30,12 @@ router.post('/', async (req, res) => {
     });
     if (recentWebhookHits.length > MAX_RECENT) recentWebhookHits.pop();
   } catch (_) {}
-  
+
   // 2.1) Ping simple si payload vide
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(200).json({ message: 'Webhook OK (ping)' });
   }
-});
+
   // 2.2) Récup ID client
   const customerId = req.body.id;
   if (!customerId) {
@@ -44,8 +46,7 @@ router.post('/', async (req, res) => {
     // ----------------------------------------------------
     // 2.3) Lecture du client complet
     // ----------------------------------------------------
-    const { data: { customer } } = await axios.get(
-      // [CHANGED] URL corrigée
+    const { data } = await axios.get(
       `${SHOPIFY_BASE}/customers/${customerId}.json`,
       {
         headers: {
@@ -54,7 +55,7 @@ router.post('/', async (req, res) => {
         }
       }
     );
-
+    const customer = data?.customer;
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
@@ -64,16 +65,14 @@ router.post('/', async (req, res) => {
     // ----------------------------------------------------
     let noteData = {};
     try {
-      if (customer.note) {
-        noteData = JSON.parse(customer.note);
-      }
+      if (customer.note) noteData = JSON.parse(customer.note);
     } catch (e) {
       console.warn('⚠️ Note non parsable :', customer.note);
     }
 
-    const clean = (v) => typeof v === 'string' ? v.trim() : undefined;
+    const clean = (v) => (typeof v === 'string' ? v.trim() : undefined);
 
-    // [CHANGED] Fallback sur company_name si company est absent
+    // Fallback sur company_name si company absent
     const company  = clean(noteData.company) || clean(noteData.company_name);
     const address1 = clean(noteData.address1);
     const zip      = clean(noteData.zip);
@@ -87,9 +86,7 @@ router.post('/', async (req, res) => {
     }
 
     // ----------------------------------------------------
-    // 2.6) Synchronisation bidirectionnelle Société (adresse <-> métachamps)
-    //       1) Déterminer la valeur canonique (priorité: note -> adresse -> mf company_name -> mf customer_name -> mf custome_name)
-    //       2) Aligner address.company + custom.company_name + custom.customer_name + custom.custome_name si nécessaire
+    // 2.6) Sync Société (adresse <-> métachamps)
     // ----------------------------------------------------
     const norm = (s) => (typeof s === 'string' ? s.trim() : '');
     const firstNonEmpty = (...vals) => {
@@ -97,14 +94,13 @@ router.post('/', async (req, res) => {
       return '';
     };
 
-    // 2.6.1) Lire l’état courant côté adresse
-    const addrCompanyCurrent =
-      (customer && customer.default_address && customer.default_address.company) || '';
+    // état adresse
+    const addrCompanyCurrent = customer?.default_address?.company || '';
 
-    // 2.6.2) Lire les métachamps existants en une fois (namespace=custom)
+    // métachamps custom.*
     let mfCompanyNameCurrent = '';
     let mfCustomerNameCurrent = '';
-    let mfCustomeNameCurrent = ''; // [ADD] prend en compte la variante fautive si elle existe déjà
+    let mfCustomeNameCurrent = ''; // variante fautive si déjà existante
     try {
       const mfList = await axios.get(
         `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom`,
@@ -118,31 +114,26 @@ router.post('/', async (req, res) => {
       const mfs = Array.isArray(mfList.data.metafields) ? mfList.data.metafields : [];
       const mfCompany  = mfs.find(m => m.key === 'company_name');
       const mfCustomer = mfs.find(m => m.key === 'customer_name');
-      const mfCustome  = mfs.find(m => m.key === 'custome_name'); // [ADD]
-      mfCompanyNameCurrent   = norm(mfCompany && mfCompany.value);
-      mfCustomerNameCurrent  = norm(mfCustomer && mfCustomer.value);
-      mfCustomeNameCurrent   = norm(mfCustome && mfCustome.value); // [ADD]
+      const mfCustome  = mfs.find(m => m.key === 'custome_name'); // (faute volontaire)
+      mfCompanyNameCurrent   = norm(mfCompany?.value);
+      mfCustomerNameCurrent  = norm(mfCustomer?.value);
+      mfCustomeNameCurrent   = norm(mfCustome?.value);
     } catch (e) {
       console.warn('⚠️ lecture metafields custom.* échouée :', e?.response?.data || e.message);
     }
 
-    // 2.6.3) Déterminer la valeur canonique
-    const companyFromNote = norm(company); // 'company' vient déjà de noteData.company || noteData.company_name
+    const companyFromNote = norm(company);
     const canonicalCompany = firstNonEmpty(
       companyFromNote,
       addrCompanyCurrent,
       mfCompanyNameCurrent,
       mfCustomerNameCurrent,
-      mfCustomeNameCurrent // [ADD]
+      mfCustomeNameCurrent
     );
 
-    // Si aucune valeur exploitable, on ne touche rien
-    if (!canonicalCompany) {
-      console.log('ℹ️ Aucune valeur "Société" exploitable — skip sync address/mf.');
-    } else {
-      // 2.6.4) Aligner l’ADRESSE par défaut (création ou mise à jour ciblée du champ company)
+    // aligner l’adresse par défaut
+    if (canonicalCompany) {
       if (!customer.default_address) {
-        // Créer une adresse minimale avec "company" et la définir par défaut
         console.log('➕ Création d’une adresse client (default) avec company');
         await axios.post(
           `${SHOPIFY_BASE}/customers/${customerId}/addresses.json`,
@@ -166,7 +157,7 @@ router.post('/', async (req, res) => {
         console.log('✏️ Mise à jour du company sur l’adresse par défaut');
         await axios.put(
           `${SHOPIFY_BASE}/customers/${customerId}/addresses/${customer.default_address.id}.json`,
-          { address: { company: canonicalCompany } }, // mise à jour ciblée
+          { address: { company: canonicalCompany } },
           {
             headers: {
               'X-Shopify-Access-Token': SHOPIFY_API_KEY,
@@ -175,6 +166,8 @@ router.post('/', async (req, res) => {
           }
         );
       }
+    } else {
+      console.log('ℹ️ Aucune valeur "Société" exploitable — skip sync address/mf.');
     }
 
     // ----------------------------------------------------
@@ -183,7 +176,6 @@ router.post('/', async (req, res) => {
     if (vat) {
       console.log('➕ Ajout TVA en metafield');
       await axios.post(
-        // [CHANGED] URL corrigée
         `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
         {
           metafield: {
@@ -201,16 +193,12 @@ router.post('/', async (req, res) => {
         }
       );
 
-      // 🏷️ Ajout du tag TVA visible dans le back-office
       const existingTags = customer.tags?.split(',').map(t => t.trim()) || [];
       const newTags = [...new Set([...existingTags, `TVA:${vat}`])];
 
       await axios.put(
-        // [CHANGED] URL corrigée
         `${SHOPIFY_BASE}/customers/${customerId}.json`,
-        {
-          customer: { id: customerId, tags: newTags.join(', ') }
-        },
+        { customer: { id: customerId, tags: newTags.join(', ') } },
         {
           headers: {
             'X-Shopify-Access-Token': SHOPIFY_API_KEY,
@@ -221,171 +209,89 @@ router.post('/', async (req, res) => {
     }
 
     // ----------------------------------------------------
-    // 2.8) Upsert custom.customer_name (miroir de canonicalCompany)
+    // 2.8) Upsert custom.customer_name (miroir)
     // ----------------------------------------------------
-    try {
-      const mfGet = await axios.get(
-        `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=customer_name`,
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-            'Content-Type': 'application/json'
+    if (canonicalCompany) {
+      try {
+        const mfGet = await axios.get(
+          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=customer_name`,
+          { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
+        );
+        const existing = (mfGet.data.metafields || [])[0];
+        if (existing?.id) {
+          if (norm(existing.value) !== canonicalCompany) {
+            await axios.put(
+              `${SHOPIFY_BASE}/metafields/${existing.id}.json`,
+              { metafield: { id: existing.id, type: 'single_line_text_field', value: canonicalCompany } },
+              { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
+            );
           }
-        }
-      );
-      const existing = (mfGet.data.metafields || [])[0];
-      if (existing && existing.id) {
-        if (norm(existing.value) !== canonicalCompany) {
-          await axios.put(
-            `${SHOPIFY_BASE}/metafields/${existing.id}.json`,
-            {
-              metafield: {
-                id: existing.id,
-                type: 'single_line_text_field',
-                value: canonicalCompany
-              }
-            },
-            {
-              headers: {
-                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
+        } else {
+          await axios.post(
+            `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
+            { metafield: { namespace: 'custom', key: 'customer_name', type: 'single_line_text_field', value: canonicalCompany } },
+            { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
           );
         }
-      } else {
-        await axios.post(
-          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
-          {
-            metafield: {
-              namespace: 'custom',
-              key: 'customer_name',
-              type: 'single_line_text_field',
-              value: canonicalCompany
-            }
-          },
-          {
-            headers: {
-              'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+      } catch (e) {
+        console.warn('⚠️ customer_name metafield upsert failed:', e?.response?.data || e.message);
       }
-    } catch (e) {
-      console.warn('⚠️ customer_name metafield upsert failed:', e?.response?.data || e.message);
-    }
 
-    // ----------------------------------------------------
-    // 2.8 bis) Upsert custom.company_name (miroir de canonicalCompany)
-    // ----------------------------------------------------
-    try {
-      const mfGet2 = await axios.get(
-        `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=company_name`,
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-            'Content-Type': 'application/json'
+      // ----------------------------------------------------
+      // 2.8 bis) Upsert custom.company_name (miroir)
+      // ----------------------------------------------------
+      try {
+        const mfGet2 = await axios.get(
+          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=company_name`,
+          { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
+        );
+        const existing2 = (mfGet2.data.metafields || [])[0];
+        if (existing2?.id) {
+          if (norm(existing2.value) !== canonicalCompany) {
+            await axios.put(
+              `${SHOPIFY_BASE}/metafields/${existing2.id}.json`,
+              { metafield: { id: existing2.id, type: 'single_line_text_field', value: canonicalCompany } },
+              { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
+            );
           }
-        }
-      );
-      const existing2 = (mfGet2.data.metafields || [])[0];
-      if (existing2 && existing2.id) {
-        if (norm(existing2.value) !== canonicalCompany) {
-          await axios.put(
-            `${SHOPIFY_BASE}/metafields/${existing2.id}.json`,
-            {
-              metafield: {
-                id: existing2.id,
-                type: 'single_line_text_field',
-                value: canonicalCompany
-              }
-            },
-            {
-              headers: {
-                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
+        } else {
+          await axios.post(
+            `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
+            { metafield: { namespace: 'custom', key: 'company_name', type: 'single_line_text_field', value: canonicalCompany } },
+            { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
           );
         }
-      } else {
-        await axios.post(
-          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
-          {
-            metafield: {
-              namespace: 'custom',
-              key: 'company_name',
-              type: 'single_line_text_field',
-              value: canonicalCompany
-            }
-          },
-          {
-            headers: {
-              'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+      } catch (e) {
+        console.warn('⚠️ company_name metafield upsert failed:', e?.response?.data || e.message);
       }
-    } catch (e) {
-      console.warn('⚠️ company_name metafield upsert failed:', e?.response?.data || e.message);
-    }
 
-    // ----------------------------------------------------
-    // 2.8 ter) [ADD] Upsert custom.customer_name (miroir de canonicalCompany)
-    // ----------------------------------------------------
-    try {
-      const mfGet3 = await axios.get(
-        `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=customer_name`,
-        {
-          headers: {
-            'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-            'Content-Type': 'application/json'
+      // ----------------------------------------------------
+      // 2.8 ter) Upsert custom.custome_name (miroir — clé fautive si déjà exploitée ailleurs)
+      // ----------------------------------------------------
+      try {
+        const mfGet3 = await axios.get(
+          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json?namespace=custom&key=custome_name`,
+          { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
+        );
+        const existing3 = (mfGet3.data.metafields || [])[0];
+        if (existing3?.id) {
+          if (norm(existing3.value) !== canonicalCompany) {
+            await axios.put(
+              `${SHOPIFY_BASE}/metafields/${existing3.id}.json`,
+              { metafield: { id: existing3.id, type: 'single_line_text_field', value: canonicalCompany } },
+              { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
+            );
           }
-        }
-      );
-      const existing3 = (mfGet3.data.metafields || [])[0];
-      if (existing3 && existing3.id) {
-        if (norm(existing3.value) !== canonicalCompany) {
-          await axios.put(
-            `${SHOPIFY_BASE}/metafields/${existing3.id}.json`,
-            {
-              metafield: {
-                id: existing3.id,
-                type: 'single_line_text_field',
-                value: canonicalCompany
-              }
-            },
-            {
-              headers: {
-                'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-                'Content-Type': 'application/json'
-              }
-            }
+        } else {
+          await axios.post(
+            `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
+            { metafield: { namespace: 'custom', key: 'custome_name', type: 'single_line_text_field', value: canonicalCompany } },
+            { headers: { 'X-Shopify-Access-Token': SHOPIFY_API_KEY, 'Content-Type': 'application/json' } }
           );
         }
-      } else {
-        await axios.post(
-          `${SHOPIFY_BASE}/customers/${customerId}/metafields.json`,
-          {
-            metafield: {
-              namespace: 'custom',
-              key: 'custome_name',               // ← (fautif volontaire)
-              type: 'single_line_text_field',
-              value: canonicalCompany
-            }
-          },
-          {
-            headers: {
-              'X-Shopify-Access-Token': SHOPIFY_API_KEY,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+      } catch (e) {
+        console.warn('⚠️ custome_name metafield upsert failed:', e?.response?.data || e.message);
       }
-    } catch (e) {
-      console.warn('⚠️ custome_name metafield upsert failed:', e?.response?.data || e.message);
     }
 
     // ----------------------------------------------------
@@ -410,7 +316,6 @@ router.get('/_ping', (req, res) => {
 router.get('/_last', (req, res) => {
   res.json({ count: recentWebhookHits.length, items: recentWebhookHits });
 });
-
 
 // ========================================================
 // 3) EXPORT ROUTER
