@@ -7,12 +7,14 @@ Small Node.js/Express server to create and manage Shopify draft orders, send con
 ```
 shopify-draft-server/
   package.json
+  env.template
   render.yaml
   server.js
   routes/
     draftOrderRoutes.js
     sync-customer-data.js
   scripts/
+    setup-env.js          # Interactive environment setup
     register-webhook.js
   snippets/
     regpro-recaptcha-loader.liquid
@@ -32,12 +34,15 @@ shopify-draft-server/
 - Rate limiting (`express-rate-limit`)
 - Environment variables (`dotenv`)
 - HTTP clients: `axios` and native `fetch`
+- Interactive CLI (`prompts`)
+- Email sending (`nodemailer`)
 - Shopify Admin REST API (version 2023-10)
 - Render (deployment) via `render.yaml`
 
 ## Purpose of each file
 
-- `package.json`: Project metadata, Node engine (>=18), start script, dependencies.
+- `package.json`: Project metadata, Node engine (>=18), scripts (start, setup), dependencies.
+- `env.template`: Environment variables template with detailed documentation.
 - `render.yaml`: Render service definition (repo, region, env vars, build/start commands).
 - `server.js`:
   - Initializes Express app, trust proxy, CORS, body parsing, global rate limiter, and a `/health` endpoint.
@@ -55,6 +60,10 @@ shopify-draft-server/
 - `routes/sync-customer-data.js`:
   - Webhook target (mounted at `/sync-customer-data`).
   - On `customers/create`, fetch full customer, parse `customer.note` JSON, update default address, store VAT in metafield, and add a `TVA:<number>` tag.
+- `scripts/setup-env.js`:
+  - Interactive CLI tool for environment configuration (run via `npm run setup`).
+  - Provides guided setup with validation, secure defaults, and automatic .env generation.
+  - Supports quick mode (`npm run setup:quick`) for essential Shopify settings only.
 - `scripts/register-webhook.js`:
   - On startup, idempotently registers the `customers/create` webhook to `PUBLIC_WEBHOOK_URL` (or a default Render URL) using native `fetch`.
 - `snippets/regpro-recaptcha-loader.liquid`:
@@ -84,18 +93,109 @@ shopify-draft-server/
   - `scripts/register-webhook.js` falls back to a hardcoded Render URL if `PUBLIC_WEBHOOK_URL` is missing.
   - reCAPTCHA site keys are embedded in a public snippet; rotate keys if the repo is public.
 
-## Environment variables
+## Quick Start
 
-- `SHOPIFY_API_URL` (e.g. `your-shop.myshopify.com` — or full base if you choose that convention)
-- `SHOPIFY_API_KEY` (Admin API access token)
-- `API_SECRET` (shared secret for server endpoints)
-- `PORT` (optional; defaults to 3000)
-- `PUBLIC_WEBHOOK_URL` (optional; full URL for webhook registration)
-- `COPY_TO_ADDRESS` (optional; default CC for receipts)
+**Web links:**
 
-## Run locally
+- 🌐 Zyo website: [www.zyö.com](https://www.zyö.com) / [www.xn--zy-gka.com](https://www.xn--zy-gka.com)
+- 🌐 Ikyum website: [www.ikyum.com](https://www.ikyum.com)
+- 🌐 Render URL: [https://shopify-draft-server.onrender.com](https://shopify-draft-server.onrender.com)
+- 🛍️ Shopify admin apps: [staff order creator](https://admin.shopify.com/store/21qdxp-hd/settings/apps/development)
+- ⚙️ Shopify [domains](https://admin.shopify.com/store/21qdxp-hd/settings/domains)
+- 📝 Render Dashboard (environment variables): [https://dashboard.render.com/web/srv-d0gt70be5dus73alpc1g/env](https://dashboard.render.com/web/srv-d0gt70be5dus73alpc1g/env)
+- ⚙️ Render Dashboard (webhooks): [https://dashboard.render.com/webhooks](https://dashboard.render.com/webhooks)
 
-- Node 18+: `npm install` then `npm start`
-- Ensure all required env vars are set (use a `.env` file with `dotenv`).
+**Documentation:**
 
+- [Render WebHooks](https://render.com/docs/webhooks)
 
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment (Interactive setup)
+
+```bash
+# Quick setup - only essential Shopify settings
+npm run setup:quick
+
+# Full setup - all configuration options
+npm run setup
+```
+
+The interactive setup will:
+
+- Guide you through all required environment variables
+- Generate secure API secrets automatically
+- Create a `.env` file with your configuration
+- Provide helpful hints and validation
+
+### 3. Run the server
+
+```bash
+npm start
+```
+
+## Setup Script Examples
+
+### Quick Setup (Essential Shopify settings only)
+
+```bash
+npm run setup:quick
+```
+
+This will prompt for:
+
+- Shopify store domain
+- Shopify Admin API access token
+- API secret (auto-generated or custom)
+
+### Full Setup (All configuration options)
+
+```bash
+npm run setup
+```
+
+This will guide you through all environment variables including:
+
+- Core Shopify settings
+- Email/SMTP configuration
+- reCAPTCHA settings
+- Optional branding and server settings
+
+The script provides:
+
+- ✅ Input validation and helpful error messages
+- ✅ Secure auto-generation of API secrets
+- ✅ Helpful hints and examples for each setting
+- ✅ Compact, well-commented `.env` file generation
+
+## Environment Variables
+
+### Required (Core Shopify Integration)
+
+- `SHOPIFY_API_URL` - Your Shopify store domain (e.g., `your-shop.myshopify.com`)
+- `SHOPIFY_API_KEY` - Shopify Admin API access token (starts with `shpat_`)
+- `API_SECRET` - Shared secret for API authentication between theme and server
+
+### Required for Email Features
+
+- `IKYUM_SMTP_USER` - SMTP email username
+- `IKYUM_SMTP_PASS` - SMTP email password
+- `IKYUM_ADMIN_RECIPIENTS` - Admin email addresses (comma-separated)
+- `IKYUM_RECAPTCHA_SECRET` - Google reCAPTCHA v3 secret key
+
+### Optional (with defaults)
+
+- `PORT` - Server port (default: 3000, auto-set by hosting platforms)
+- `PUBLIC_WEBHOOK_URL` - Webhook endpoint URL for Shopify
+- `IKYUM_SMTP_HOST` - SMTP server (default: `mail.infomaniak.com`)
+- `IKYUM_SMTP_PORT` - SMTP port (default: 587)
+- `IKYUM_SMTP_FROM` - Email "From" address
+- `COPY_TO_ADDRESS` - Fallback email for copies
+- `IKYUM_BRAND` - Brand name used in emails
+- `IKYUM_RECAPTCHA_MIN_SCORE` - reCAPTCHA minimum score (default: 0.5)
+
+> **Tip**: Use the interactive setup script (`npm run setup`) instead of configuring manually. It provides validation, secure defaults, and helpful guidance.
