@@ -29,13 +29,19 @@ function mask(v) {
   return v.slice(0,4) + '…' + v.slice(-4);
 }
 
-console.log('→ Loaded ENV:',
-  'API_SECRET=', mask(process.env.API_SECRET || ''),
-  'SHOPIFY_API_URL=', process.env.SHOPIFY_API_URL || '',
-  'SHOPIFY_API_KEY=', mask(process.env.SHOPIFY_API_KEY || '')
-);
+// console.log('→ Loaded ENV:',
+// <<<<<<< HEAD
+//   'API_SECRET=', mask(process.env.API_SECRET || ''),
+//   'SHOPIFY_API_URL=', process.env.SHOPIFY_API_URL || '',
+//   'SHOPIFY_API_KEY=', mask(process.env.SHOPIFY_API_KEY || '')
+// =======
+//   'API_SECRET=',        process.env.API_SECRET,
+//   'SHOPIFY_API_URL=',   process.env.SHOPIFY_API_URL,
+//   'SHOPIFY_API_KEY=',   process.env.SHOPIFY_API_KEY
+// >>>>>>> origin/lhu
+// );
 
-// Adresse interne pour copie des emails
+// Adresse interne pour copie des emails (non utilisée ici mais gardée pour compat)
 const COPY_TO_ADDRESS = process.env.COPY_TO_ADDRESS || 'info@rednmore.com';
 
 // Routes et enregistrement des webhooks
@@ -47,7 +53,7 @@ require('./scripts/register-webhook');
 /* 2. INITIALISATION DE L'APPLICATION */
 // =========================================
 const app = express();
-app.set('trust proxy', 1); // Faire confiance au proxy pour X-Forwarded-
+app.set('trust proxy', 1); // Faire confiance au proxy pour X-Forwarded-*
 
 // =========================================
 /* 3. CONSTANTES GLOBALES */
@@ -90,54 +96,26 @@ function shopifyHeaders() {
 // =========================================
 /* 4. MIDDLEWARES GLOBAUX */
 // =========================================
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    const ok = ALLOWED_ORIGINS.some(function(o) {
+      return typeof o === 'string'
+        ? o === origin
+        : o instanceof RegExp
+          ? o.test(origin)
+          : false;
+    });
+    if (ok) return callback(null, true);
+    console.warn('⛔ Origine refusée :', origin);
+    callback(new Error('CORS non autorisé'));
+  },
+  methods: ['GET','POST','PUT','OPTIONS'],
+  allowedHeaders: ['Content-Type','X-API-KEY'],
+  optionsSuccessStatus: 200
+}));
 
-// ✅ CORS dynamique "safe" pour vos domaines autorisés
-const ALLOWED_SET = new Set(
-  (Array.isArray(ALLOWED_ORIGINS) ? ALLOWED_ORIGINS : []).filter(v => typeof v === 'string')
-);
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const isAllowed = !!origin && (
-    ALLOWED_SET.has(origin) ||
-    ALLOWED_ORIGINS.some(o => o instanceof RegExp ? o.test(origin) : o === origin)
-  );
-
-  if (isAllowed) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin'); // cache-safe
-  }
-
-  // Méthodes acceptées
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
-
-  // Reflète exactement les headers demandés par le navigateur (évite d'oublier un header custom)
-  const reqAllowed = req.headers['access-control-request-headers'];
-  if (reqAllowed) {
-    res.setHeader('Access-Control-Allow-Headers', reqAllowed);
-  } else {
-    // Par défaut, les plus courants
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key, Idempotency-Key');
-  }
-
-  // Si vous utilisez des cookies/Authorization côté client, décommentez :
-  // res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  if (req.method === 'OPTIONS') {
-    // Logs de debug preflight
-    console.log('[CORS][OPTIONS]',
-      'origin=', origin,
-      'req-headers=', reqAllowed || '(none)',
-      'path=', req.originalUrl
-    );
-    return res.status(204).end();
-  }
-
-  next();
-});
-
-// Augmente la limite JSON (utile si payload un peu lourd)
-app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.json());
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -147,6 +125,11 @@ const globalLimiter = rateLimit({
   message: { message: 'Trop de requêtes. Veuillez réessayer plus tard.' }
 });
 app.use(globalLimiter);
+
+// Petit endpoint de santé
+app.get('/health', function (_req, res) {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
 
 // =========================================
 /* 5. ROUTE WEBHOOK : /sync-customer-data */
@@ -204,56 +187,70 @@ setInterval(() => {
       Récupère la liste des clients pour le staff */
 // =========================================
 app.get('/list-customers', async function(req, res) {
-  var clientKey = req.headers['x-api-key'] || req.query.key;
+  const clientKey = req.headers['x-api-key'] || req.query.key;
   if (!clientKey || clientKey !== process.env.API_SECRET) {
     return res.status(403).json({ message: 'Clé API invalide' });
   }
-  var origin = req.get('origin');
+
+  const origin = req.get('origin');
   if (origin && !ALLOWED_ORIGINS.some(function(o) {
-      return typeof o === 'string'
-        ? o === origin
-        : o instanceof RegExp
-          ? o.test(origin)
-          : false;
-    })) {
+    return typeof o === 'string'
+      ? o === origin
+      : o instanceof RegExp
+        ? o.test(origin)
+        : false;
+  })) {
     return res.status(403).json({ message: 'Origine non autorisée' });
   }
 
   try {
-    var shopRes = await fetch(
+    // Liste simple
+    const shopRes = await axios.get(
       shopifyBaseUrl + '/customers.json?limit=100',
       {
         headers: {
           'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 15000
       }
     );
-    var data = await shopRes.json();
-    if (!data.customers) {
+
+    if (shopRes.status < 200 || shopRes.status >= 300) {
+      return res.status(502).json({
+        message: 'Shopify non OK',
+        status: shopRes.status,
+        body: shopRes.data
+      });
+    }
+
+    const data = shopRes.data;
+    if (!data || !data.customers) {
       return res.status(500).json({ message: 'Aucun client trouvé', raw: data });
     }
 
-    var clients = await Promise.all(
+    // Enrichissement label par client
+    const clients = await Promise.all(
       data.customers.map(async function(c) {
         try {
-          var detailRes = await fetch(
+          const detailRes = await axios.get(
             shopifyBaseUrl + '/customers/' + c.id + '.json',
             {
               headers: {
                 'X-Shopify-Access-Token': process.env.SHOPIFY_API_KEY,
                 'Content-Type': 'application/json'
-              }
+              },
+              timeout: 15000
             }
           );
-          var full = (await detailRes.json()).customer;
+          const full = (await detailRes.json()).customer;
 
           // --- Priorité à la société (changement minimal) ---
-          var companyFromDefault = full && full.default_address && full.default_address.company;
-          var companyFromFirst   = full && full.addresses && full.addresses[0] && full.addresses[0].company;
-          var company            = companyFromDefault || companyFromFirst;
+          const companyFromDefault = full && full.default_address && full.default_address.company;
+          const companyFromFirst   = full && full.addresses && full.addresses[0] && full.addresses[0].company;
+          const company            = companyFromDefault || companyFromFirst;
 
-          var label;
+          let label;
           if (company) {
             label = company; // société en premier
           } else if (full.first_name || full.last_name) {
@@ -742,7 +739,7 @@ app.post('/ikyum/regpro/submit', ikyumLimiter, async function(req, res) {
 // =========================================
 /* 10. LANCEMENT DU SERVEUR */
 // =========================================
-var PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, function() {
   console.log('✅ Serveur actif sur le port ' + PORT);
 });

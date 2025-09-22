@@ -14,7 +14,7 @@ const WEBHOOK_ADDRESS =
 const API_VERSION = '2023-10';
 
 if (!SHOP || !API_KEY) {
-  console.error('❌ register-webhook: SHOPIFY_API_URL ou SHOPIFY_API_KEY manquant — on ignore l’installation des webhooks.');
+  console.error("❌ register-webhook: SHOPIFY_API_URL ou SHOPIFY_API_KEY manquant — on ignore l'installation des webhooks.");
   return; // ne pas process.exit() pour ne pas planter le serveur si ce fichier est require() au démarrage
 }
 
