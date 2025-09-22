@@ -1,0 +1,179 @@
+# Best Practices for Developing an Express Backend to Supercharge a Shopify E-commerce Shop
+
+## 1. General Express Backend Best Practices
+
+- Use environment variables for all secrets and configuration (dotenv).
+- Always validate and sanitize incoming data (e.g., with express-validator).
+- Implement rate limiting (e.g., express-rate-limit) to prevent abuse.
+- Use CORS with a whitelist of allowed origins.
+- Handle errors globally and log them (uncaughtException, unhandledRejection).
+- Structure routes and controllers for maintainability (separate files).
+- Use async/await and handle promise rejections.
+- Mask sensitive data in logs.
+- Use HTTPS in production and secure cookies/sessions if needed.
+- Keep dependencies up to date and audit for vulnerabilities.
+
+## 2. Best Practices Specific to Shopify Liquid Templating
+
+- Never expose sensitive logic or secrets in Liquid templates.
+- Use Shopify metafields and custom properties to inject B2B data.
+- Keep business logic in the backend; use Liquid only for presentation.
+- Use sections and snippets for reusable template code.
+- Leverage Shopify's built-in filters and avoid custom JS for critical logic.
+- Test templates with multiple customer types (B2B, B2C, guest).
+- Use theme app extensions for dynamic data injection when possible.
+
+## 3. Best Practices Specific to ExpressJS
+
+- Use middleware for authentication, logging, and error handling.
+- Modularize routes and middleware for clarity.
+- Prefer async/await over callbacks for readability.
+- Use helmet for setting secure HTTP headers.
+- Validate all incoming requests (body, params, query).
+- Return consistent JSON error responses.
+- Document your API endpoints (e.g., with Swagger or Postman).
+- Write unit and integration tests for routes and middleware.
+- Write a zod schema of the data coming to and from APIs
+- Write a complete model in a file model.js
+- Write a mapping between routes and action functions
+- Separate action functions by resource in separate directories
+
+## 4. Service-Specific Recommendations
+
+### Shopify Admin REST API
+
+- Latest API Version: 2025-07 (as of 2025-09)
+- Base URL: `https://{shop}.myshopify.com/admin/api/2025-07`
+- Official Node.js client: '@shopify/shopify-api' (https://github.com/Shopify/shopify-node-api)
+- Write the curl command on top of each API action function
+
+Example usage:
+
+```javascript
+const Shopify = require("shopify-api-node");
+const shopify = new Shopify({ shopName, accessToken });
+```
+
+### OnRender Deployment
+
+- Use Render's GitHub/GitLab integration for CI/CD.
+- To manage git hooks (e.g., pre-push, pre-commit), use 'husky' in your repo:
+  1. Install: `npm install husky --save-dev`
+  2. Enable: `npx husky install`
+  3. Add hooks: `npx husky add .husky/pre-commit "npm test"`
+- Document deployment steps and environment variables in README.
+
+### Google reCAPTCHA v3
+
+- Latest API Docs: https://developers.google.com/recaptcha/docs/v3
+- Site Verify Endpoint: `https://www.google.com/recaptcha/api/siteverify`
+- No official Node.js client, but you can use 'node-fetch' or 'axios' to verify tokens:
+
+```javascript
+const axios = require("axios");
+const response = await axios.post(
+  "https://www.google.com/recaptcha/api/siteverify",
+  {
+    secret,
+    response: token,
+  }
+);
+```
+
+- Always verify the reCAPTCHA token server-side before processing sensitive actions.
+
+```js
+// Example Express middleware to verify Google reCAPTCHA v3 server-side:
+
+/**
+ * Middleware to verify Google reCAPTCHA v3 token in Express.
+ * Expects the token in req.body.recaptchaToken (or adapt as needed).
+ */
+async function verifyRecaptcha(req, res, next) {
+  const token = req.body.recaptchaToken;
+  if (!token) {
+    return res.status(400).json({ message: "Missing reCAPTCHA token" });
+  }
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secret) {
+    return res.status(500).json({ message: "reCAPTCHA secret not configured" });
+  }
+  try {
+    const params = new URLSearchParams();
+    params.append("secret", secret);
+    params.append("response", token);
+    // Optionally: params.append("remoteip", req.ip);
+
+    const recaptchaRes = await fetch(
+      "https://www.google.com/recaptcha/api/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params,
+      }
+    );
+    const data = await recaptchaRes.json();
+    if (!data.success || (data.score !== undefined && data.score < 0.5)) {
+      return res
+        .status(403)
+        .json({ message: "Failed reCAPTCHA verification", score: data.score });
+    }
+    // Optionally: attach score or data to req for downstream handlers
+    next();
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ message: "Error verifying reCAPTCHA", error: err.message });
+  }
+}
+```
+
+Usage in an Express route:
+
+```js
+router.post("/your-protected-route", verifyRecaptcha, async (req, res) => {
+  // Your protected logic here
+});
+```
+
+Client-side usage of Google reCAPTCHA v3 with Shopify Liquid:
+
+There is no official npm package for Google reCAPTCHA v3 for browsers; you use Google's provided JS API.
+Integration with Shopify Liquid is done by injecting the reCAPTCHA script and rendering the site key from theme settings or hardcoding.
+
+1. In your Shopify theme (Liquid template), add the reCAPTCHA v3 script:
+
+```html
+<script src="https://www.google.com/recaptcha/api.js?render={{ settings.recaptcha_site_key | default: '6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw' }}"></script>
+```
+
+Or, if not using theme settings, hardcode the site key:
+
+```html
+<script src="https://www.google.com/recaptcha/api.js?render=6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw"></script>
+```
+
+2. Before submitting your form (e.g., registration or order form), call:
+
+```js
+grecaptcha.ready(function () {
+  grecaptcha
+    .execute("6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw", { action: "submit" })
+    .then(function (token) {
+      document.getElementById("recaptchaToken").value = token;
+    });
+});
+```
+
+Your form should include a hidden input:
+
+```html
+<input type="hidden" name="recaptchaToken" id="recaptchaToken" />
+```
+
+3. On the server (Express), use the verifyRecaptcha middleware to validate the token.
+
+There is no need for an npm package on the client; Google's script is loaded directly.
+For AJAX forms, get the token with grecaptcha.execute, then include it in your POST body as recaptchaToken.
+For Liquid, you can use theme settings or hardcode the site key.
+The server-side middleware expects the token in req.body.recaptchaToken.
