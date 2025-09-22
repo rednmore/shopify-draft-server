@@ -4,9 +4,6 @@
   "license": "UNLICENSED",
   "description": "Serveur pour créer des draft orders Shopify",
   "main": "server.js",
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
     "start": "node server.js"
   },
