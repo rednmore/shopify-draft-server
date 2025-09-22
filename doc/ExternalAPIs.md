@@ -23,13 +23,13 @@ Based on my analysis of the codebase, here are all the external APIs accessed by
   - `/webhooks.json` - Manage webhooks (GET/POST)
 - **Authentication**: X-Shopify-Access-Token header
 
-## **Google reCAPTCHA v3**
+## **Shopify Built-in hCaptcha**
 
-- **Verification URL**: `https://www.google.com/recaptcha/api/siteverify`
-- **Client API**: `https://www.google.com/recaptcha/api.js?render={SITE_KEY}`
-- **Purpose**: Form submission protection for registration forms
-- **Site Keys**:
-  - `6LcZNLkrAAAAAOW2H08jogeIXhjw0S59U1cwKoUw` (for both domains)
+- **Integration**: Automatic via `{{ content_for_header }}` in theme layouts
+- **Purpose**: Spam protection for customer, contact, and blog comment forms
+- **Configuration**: Shopify Admin > Online Store > Preferences
+- **Documentation**: [Shopify CAPTCHA Docs](https://shopify.dev/docs/storefronts/themes/trust-security/captcha)
+- **Note**: Replaces need for Google reCAPTCHA - works automatically with Shopify forms
 
 ## **Geoapify Geocoding API**
 
@@ -77,8 +77,8 @@ The application also exposes its own API endpoints that are called by the Shopif
 
 - **Shopify API**: X-Shopify-Access-Token header
 - **Internal APIs**: X-API-KEY header or query parameter
-- **reCAPTCHA**: Site key validation
+- **hCaptcha**: Automatic via Shopify's built-in integration
 - **SMTP**: Username/password authentication
 - **Geoapify**: API key parameter
 
-The application primarily integrates with Shopify's ecosystem while using Google reCAPTCHA for security, Geoapify for address autocomplete, and Infomaniak for email services.
+The application primarily integrates with Shopify's ecosystem while using Shopify's built-in hCaptcha for security, Geoapify for address autocomplete, and Infomaniak for email services.

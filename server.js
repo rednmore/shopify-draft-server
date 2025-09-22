@@ -479,24 +479,6 @@ function escapeHTML(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
-async function verifyRecaptchaV3(token, expectedAction) {
-  const secret = process.env.IKYUM_RECAPTCHA_SECRET; // v3 (domaine ikyum.com)
-  if (!secret) return { ok:false, reason:'missing-secret' };
-  const params = new URLSearchParams();
-  params.set('secret', secret);
-  params.set('response', token || '');
-  const r = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-    method:'POST',
-    headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
-    body: params.toString()
-  });
-  const json = await r.json().catch(()=>({}));
-  if (!json.success) return { ok:false, reason:'recaptcha-failed', details:json };
-  const min = Number(process.env.IKYUM_RECAPTCHA_MIN_SCORE || '0.5');
-  if (typeof json.score === 'number' && json.score < min) return { ok:false, reason:'low-score', details:json };
-  if (expectedAction && json.action && json.action !== expectedAction) return { ok:false, reason:'wrong-action', details:json };
-  return { ok:true, details:json };
-}
 function makeIkyumTransport() {
   // SMTP Infomaniak dédié IKYUM
   return nodemailer.createTransport({
@@ -642,7 +624,7 @@ async function ensureCustomerCompany(data) {
 // =========================================
 app.post('/ikyum/regpro/submit', ikyumLimiter, async function(req, res) {
   try {
-    const { data, token, token_user, hp } = req.body || {};
+    const { data, hp } = req.body || {};
 
     // Honeypot: on simule le succès (aucun envoi)
     if (hp && String(hp).trim() !== '') {
@@ -652,15 +634,8 @@ app.post('/ikyum/regpro/submit', ikyumLimiter, async function(req, res) {
     if (!data || typeof data !== 'object') {
       return res.status(400).json({ ok:false, error:'invalid-payload' });
     }
-    if (!token) {
-      return res.status(400).json({ ok:false, error:'missing-recaptcha-token' });
-    }
-
-    // reCAPTCHA v3 (action admin)
-    const adminVR = await verifyRecaptchaV3(token, 'regpro_admin');
-    if (!adminVR.ok) {
-      return res.status(403).json({ ok:false, error:adminVR.reason, details:adminVR.details });
-    }
+    // Note: Shopify's built-in hCaptcha handles spam protection automatically
+    // No additional CAPTCHA verification needed on server-side
 
     // Prépare envois
     const transporter = makeIkyumTransport();
@@ -692,23 +667,18 @@ app.post('/ikyum/regpro/submit', ikyumLimiter, async function(req, res) {
       }]
     });
 
-    // --- Email USER (optionnel, uniquement si token_user valide)
-    if (userEmail && token_user) {
-      const userVR = await verifyRecaptchaV3(token_user, 'regpro_user');
-      if (userVR.ok) {
-        await transporter.sendMail({
-          from: process.env.IKYUM_SMTP_FROM || process.env.IKYUM_SMTP_USER,
-          to: userEmail,
-          subject: `Thank you — ${brand}`,
-          html: `
-            <p>Thank you for your request.</p>
-            <p>We received the company name: <strong>${escapeHTML(data.company_name || '')}</strong>.</p>
-            <p>We will get back to you shortly.</p>
-          `
-        });
-      } else {
-        console.warn('[IKYUM user mail] recaptcha failed', userVR);
-      }
+    // --- Email USER (optionnel)
+    if (userEmail) {
+      await transporter.sendMail({
+        from: process.env.IKYUM_SMTP_FROM || process.env.IKYUM_SMTP_USER,
+        to: userEmail,
+        subject: `Thank you — ${brand}`,
+        html: `
+          <p>Thank you for your request.</p>
+          <p>We received the company name: <strong>${escapeHTML(data.company_name || '')}</strong>.</p>
+          <p>We will get back to you shortly.</p>
+        `
+      });
     }
 
     // === NOUVEAU : tentative de MAJ Admin -> address.company ===

@@ -67,9 +67,71 @@ shopify-draft-server/
 - `scripts/register-webhook.js`:
   - On startup, idempotently registers the `customers/create` webhook to `PUBLIC_WEBHOOK_URL` (or a default Render URL) using native `fetch`.
 - `snippets/regpro-recaptcha-loader.liquid`:
-  - Client-side Shopify theme snippet to load reCAPTCHA v3 and post a form payload to a backend endpoint (placeholder `ENDPOINT`).
+  - ⚠️ **DEPRECATED** - Client-side Shopify theme snippet with Google reCAPTCHA v3 code (should be removed).
 - `shopify/`:
   - Theme artifacts used on the storefront; not executed by this Node server.
+
+## Webhook Architecture
+
+This application uses **Shopify webhooks** (not Render webhooks) for real-time customer data synchronization:
+
+### Shopify Webhooks (✅ Implemented)
+
+- **Direction**: Shopify → Your Server
+- **Purpose**: Notify server when customers are created/updated
+- **Endpoint**: `/sync-customer-data`
+- **Topics**: `customers/create`, `customers/update`
+- **Registration**: Automatic via `scripts/register-webhook.js` on server startup
+- **Handler**: `routes/sync-customer-data.js`
+
+**How it works:**
+
+1. Server starts → `register-webhook.js` registers webhooks with Shopify
+2. Customer created/updated in Shopify → Shopify sends POST to `PUBLIC_WEBHOOK_URL/sync-customer-data`
+3. Server processes customer data → Updates addresses, metafields, tags automatically
+
+### Render Webhooks (❌ Not implemented)
+
+- **Status**: Not currently configured
+- **Purpose**: Would be for deployment notifications (Render → External service)
+- **Documentation**: [Render WebHooks Docs](https://render.com/docs/webhooks) (for future reference)
+
+> **Note**: The `PUBLIC_WEBHOOK_URL` environment variable refers to where **Shopify** should send webhooks TO your server, not where your server sends webhooks to Render.
+
+## CAPTCHA Configuration
+
+This application now uses **Shopify's built-in hCaptcha** instead of Google reCAPTCHA for spam protection:
+
+### ✅ **Server-side** (Already Updated)
+
+- Removed Google reCAPTCHA verification from server endpoints
+- Forms now rely on Shopify's automatic hCaptcha protection
+
+### ⚠️ **Client-side** (Manual Cleanup Required)
+
+The following Shopify theme files contain legacy Google reCAPTCHA code that should be updated:
+
+**Files to update:**
+
+- `shopify/snippets/regpro-recaptcha-loader.liquid` - Remove or replace with simplified form handler
+- `shopify/sections/main-register-advanced.liquid` - Remove reCAPTCHA loading and token generation
+- `snippets/regpro-recaptcha-loader.liquid` - Remove from project
+
+**Required changes:**
+
+1. Remove Google reCAPTCHA script loading (`grecaptcha` code)
+2. Remove reCAPTCHA token generation and validation
+3. Ensure `{{ content_for_header }}` is included in theme layouts
+4. Verify hCaptcha is enabled in Shopify Admin > Online Store > Preferences
+
+**How Shopify hCaptcha works:**
+
+- Automatically analyzes visitor behavior without user interaction
+- Shows interactive challenge only when suspicious activity detected
+- Works with forms that have proper `action` and `form_type` attributes
+- No additional configuration needed - enabled via Shopify admin settings
+
+Reference: [Shopify CAPTCHA Documentation](https://shopify.dev/docs/storefronts/themes/trust-security/captcha)
 
 ## Potential issues / risks
 
@@ -86,12 +148,13 @@ shopify-draft-server/
   - `POST /send-order-email` in `draftOrderRoutes.js` does not check `X-API-KEY` while other routes do. Add the same API key validation.
   - Webhook route does not verify Shopify HMAC signature; add HMAC verification to trust payloads.
 - Email behavior:
-  - `COPY_TO_ADDRESS` default is a production email and may leak receipts; ensure it’s configurable per environment.
+  - `COPY_TO_ADDRESS` default is a production email and may leak receipts; ensure it's configurable per environment.
 - Performance / rate limits:
   - `GET /list-customers` fetches details for up to 100 customers individually (N+1 requests). This may hit Shopify rate limits; consider pagination, fields filtering, or GraphQL.
 - Hardcoded defaults:
   - `scripts/register-webhook.js` falls back to a hardcoded Render URL if `PUBLIC_WEBHOOK_URL` is missing.
-  - reCAPTCHA site keys are embedded in a public snippet; rotate keys if the repo is public.
+- Spam protection:
+  - Uses Shopify's built-in hCaptcha instead of Google reCAPTCHA (legacy reCAPTCHA code should be removed from theme files).
 
 ## Quick Start
 
@@ -103,11 +166,6 @@ shopify-draft-server/
 - 🛍️ Shopify admin apps: [staff order creator](https://admin.shopify.com/store/21qdxp-hd/settings/apps/development)
 - ⚙️ Shopify [domains](https://admin.shopify.com/store/21qdxp-hd/settings/domains)
 - 📝 Render Dashboard (environment variables): [https://dashboard.render.com/web/srv-d0gt70be5dus73alpc1g/env](https://dashboard.render.com/web/srv-d0gt70be5dus73alpc1g/env)
-- ⚙️ Render Dashboard (webhooks): [https://dashboard.render.com/webhooks](https://dashboard.render.com/webhooks)
-
-**Documentation:**
-
-- [Render WebHooks](https://render.com/docs/webhooks)
 
 ### 1. Install dependencies
 
@@ -162,7 +220,6 @@ This will guide you through all environment variables including:
 
 - Core Shopify settings
 - Email/SMTP configuration
-- reCAPTCHA settings
 - Optional branding and server settings
 
 The script provides:
@@ -185,7 +242,6 @@ The script provides:
 - `IKYUM_SMTP_USER` - SMTP email username
 - `IKYUM_SMTP_PASS` - SMTP email password
 - `IKYUM_ADMIN_RECIPIENTS` - Admin email addresses (comma-separated)
-- `IKYUM_RECAPTCHA_SECRET` - Google reCAPTCHA v3 secret key
 
 ### Optional (with defaults)
 
@@ -196,6 +252,5 @@ The script provides:
 - `IKYUM_SMTP_FROM` - Email "From" address
 - `COPY_TO_ADDRESS` - Fallback email for copies
 - `IKYUM_BRAND` - Brand name used in emails
-- `IKYUM_RECAPTCHA_MIN_SCORE` - reCAPTCHA minimum score (default: 0.5)
 
 > **Tip**: Use the interactive setup script (`npm run setup`) instead of configuring manually. It provides validation, secure defaults, and helpful guidance.

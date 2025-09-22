@@ -115,14 +115,6 @@ const envConfig = {
     required: true
   },
 
-  // RECAPTCHA (Required for forms)
-  IKYUM_RECAPTCHA_SECRET: {
-    type: 'text',
-    message: 'Google reCAPTCHA v3 Secret Key',
-    hint: 'Get from Google reCAPTCHA Admin Console',
-    quickMode: false,
-    required: true
-  },
 
   // OPTIONAL WITH DEFAULTS
   IKYUM_SMTP_HOST: {
@@ -160,14 +152,6 @@ const envConfig = {
     quickMode: false
   },
   
-  IKYUM_RECAPTCHA_MIN_SCORE: {
-    type: 'number',
-    message: 'reCAPTCHA minimum score (0.0-1.0)',
-    initial: 0.5,
-    min: 0,
-    max: 1,
-    quickMode: false
-  },
   
   PORT: {
     type: 'number',
@@ -300,17 +284,6 @@ function generateEnvContent(answers) {
     lines.push('');
   }
   
-  // reCAPTCHA settings
-  if (answers.IKYUM_RECAPTCHA_SECRET) {
-    lines.push('# ===== GOOGLE reCAPTCHA v3 =====');
-    lines.push('# reCAPTCHA secret key for form protection');
-    lines.push(`IKYUM_RECAPTCHA_SECRET=${answers.IKYUM_RECAPTCHA_SECRET}`);
-    if (answers.IKYUM_RECAPTCHA_MIN_SCORE) {
-      lines.push('# Minimum score threshold (0.0-1.0)');
-      lines.push(`IKYUM_RECAPTCHA_MIN_SCORE=${answers.IKYUM_RECAPTCHA_MIN_SCORE}`);
-    }
-    lines.push('');
-  }
   
   // Optional settings
   const hasOptionalSettings = answers.IKYUM_BRAND || answers.PORT;
